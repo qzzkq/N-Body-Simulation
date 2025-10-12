@@ -1,0 +1,5 @@
+g++ -std=gnu++17 main.cpp object.cpp renderer.cpp control.cpp \
+  -I/mingw64/include -L/mingw64/lib \
+  -lglfw3 -lglew32 -lopengl32 -lgdi32 \
+  -static-libstdc++ -static-libgcc \
+  -o gravgrid.exe
