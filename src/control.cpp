@@ -10,6 +10,7 @@ Control::Control(GLFWwindow* window,
                  glm::vec3& cameraFront,
                  glm::vec3& cameraUp,
                  float& deltaTime,
+                 float& timeScale,
                  bool& pause,
                  bool& running,
                  float& yaw,
@@ -23,6 +24,7 @@ Control::Control(GLFWwindow* window,
       cameraFront_(cameraFront),
       cameraUp_(cameraUp),
       deltaTime_(deltaTime),
+      timeScale_(timeScale),
       pause_(pause),
       running_(running),
       yaw_(yaw),
@@ -70,6 +72,10 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
     if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS)      cameraPos_ += cameraSpeed * cameraUp_;
     if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos_ -= cameraSpeed * cameraUp_;
 
+    // Ускорение/замедление времени
+    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) timeScale_ = std::min(timeScale_ * 1.1f, 100.0f);
+    if (glfwGetKey(window_, GLFW_KEY_MINUS)   == GLFW_PRESS) timeScale_ = std::max(timeScale_ / 1.1f, 0.05f);
+    
     // Пауза на K
     if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_PRESS)   pause_ = true;
     if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_RELEASE) pause_ = false;

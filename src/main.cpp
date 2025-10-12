@@ -27,11 +27,14 @@ float pitch = 0.0f;
 float deltaTime = 0.0f;
 float lastFrame = 0.0f;
 
+float timeScale = 1.0f; // переменная для ускорения/замедления времени
+
 float grid_size2  = 400.0f;
 int   vert_count2 = 10;
 
 const double G = 6.6743e-11;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
+char title[128];
 
 std::vector<Object> objs = {};
 
@@ -91,14 +94,15 @@ objs = {
     // Управление 
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
-                    deltaTime, pause, running,
+                    deltaTime, timeScale, pause, running,
                     yaw, pitch, lastX, lastY,
                     initMass);
     control.attach();
 
     while (!glfwWindowShouldClose(window) && running) {
         float currentFrame = glfwGetTime();
-        deltaTime = currentFrame - lastFrame;
+        float dtReal = currentFrame - lastFrame;
+        deltaTime = dtReal * timeScale;
         lastFrame = currentFrame;
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -193,6 +197,11 @@ objs = {
         // Отрисовка 
         renderer.drawObjects(objs);
 
+        float fps = (dtReal > 0.0f) ? 1.0f / dtReal : 0.0f;
+        std::snprintf(title, sizeof(title),
+              "3D_TEST | timeScale: %.2fx | FPS: %.0f | Objects =: %zu",
+              timeScale, fps, objs.size());
+        glfwSetWindowTitle(window, title);
         glfwSwapBuffers(window);
         glfwPollEvents();
     }

@@ -13,6 +13,7 @@ public:
             glm::vec3& cameraFront,
             glm::vec3& cameraUp,
             float& deltaTime,
+            float& timeScale,
             bool& pause,
             bool& running,
             float& yaw,
@@ -43,6 +44,7 @@ private:
     glm::vec3& cameraFront_;
     glm::vec3& cameraUp_;
     float& deltaTime_;
+    float& timeScale_;
     bool& pause_;
     bool& running_;
     float& yaw_;
