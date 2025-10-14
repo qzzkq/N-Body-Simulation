@@ -87,6 +87,32 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
         running_ = false;
     }
 
+    //регулировка размера окна 
+    // уменьшение
+    if (glfwGetKey(window_, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
+        int w = 0, h = 0;  
+        glfwGetWindowSize(window_, &w, &h);
+        w = (int) (w * 0.9);
+        h = (int) (h * 0.9); 
+        glfwSetWindowSize(window_, w, h); // установление логического размера 
+        int frW = 0, frH = 0; 
+        glfwGetFramebufferSize(window_, &frW, &frH); 
+        glViewport(0, 0, frW, frH); 
+    }
+
+    //увеличение
+    if (glfwGetKey(window_, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS) {
+        int w = 0; 
+        int h = 0; 
+        glfwGetWindowSize(window_, &w, &h);
+        w = (int) (w * 1.1);
+        h = (int) (h * 1.1); 
+        glfwSetWindowSize(window_, w, h); // установление логического размера
+        int frW = 0, frH = 0; 
+        glfwGetFramebufferSize(window_, &frW, &frH); 
+        glViewport(0, 0, frW, frH); 
+    }
+
     // Движение создаваемого объекта стрелками
     if (!objs_.empty() && objs_.back().Initalizing) {
         if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {

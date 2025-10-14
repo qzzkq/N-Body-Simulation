@@ -62,6 +62,7 @@ void main() {
 GLFWwindow* StartGLU();
 
 int main() {
+
     GLFWwindow* window = StartGLU();
     if (!window) {
         std::cerr << "Window or OpenGL context creation failed.\n";
@@ -203,6 +204,7 @@ objs = {
               timeScale, fps, objs.size());
         glfwSetWindowTitle(window, title);
         glfwSwapBuffers(window);
+
         glfwPollEvents();
     }
 
@@ -216,11 +218,14 @@ objs = {
 
 // Инициализируем контекст openGL
 GLFWwindow* StartGLU() {
+
+    glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
+
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW\n";
         return nullptr;
     }
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
+
     GLFWwindow* window = glfwCreateWindow(800, 600, "3D_TEST", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window.\n";
