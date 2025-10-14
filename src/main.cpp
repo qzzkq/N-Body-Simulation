@@ -70,7 +70,7 @@ int main() {
     }
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
-    renderer.setProjection(65.0f, 800.0f/600.0f, 0.1f, 12000.0f);
+    renderer.setProjection(65.0f, 800.0f/600.0f, 0.1f, 1000.0f);
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
