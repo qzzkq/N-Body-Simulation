@@ -1,0 +1,13 @@
+# В директории с .cpp файлами должны быть следующие dll, которые можно установить через каждый компилятор.
+# C:\msys64\mingw64\bin\glfw3.dll
+# C:\msys64\mingw64\bin\glew32.dll
+# C:\msys64\mingw64\bin\libwinpthread-1.dll
+# C:\msys64\mingw64\bin\libstdc++-6.dll
+# C:\msys64\mingw64\bin\libgcc_s_seh-1.dll
+
+
+g++ -std=gnu++17 main.cpp object.cpp renderer.cpp control.cpp \
+  -I/mingw64/include -L/mingw64/lib \
+  -lglfw3 -lglew32 -lopengl32 -lgdi32 \
+  -static-libstdc++ -static-libgcc \
+  -o gravgrid.exe
