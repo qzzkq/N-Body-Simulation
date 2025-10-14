@@ -70,7 +70,7 @@ int main() {
     }
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
-    renderer.setProjection(65.0f, 800.0f/600.0f, 0.1f, 1200.0f);
+    renderer.setProjection(65.0f, 800.0f/600.0f, 0.1f, 12000.0f);
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
@@ -99,6 +99,10 @@ objs = {
                     yaw, pitch, lastX, lastY,
                     initMass);
     control.attach();
+
+    float currZFar = 0.f;
+    int currH = 0; 
+    int currW = 0; 
 
     while (!glfwWindowShouldClose(window) && running) {
         float currentFrame = glfwGetTime();
@@ -190,6 +194,11 @@ objs = {
                 obj.UpdatePos(deltaTime);
             }
         }
+
+        //выбор новых параметров камеры 
+        currZFar = renderer.ComputeFar(cameraPos, objs);
+        glfwGetFramebufferSize(window, &currW, &currH);
+        renderer.setProjection(65.0f, (float) currW/ (float) currH, 0.1f, currZFar);
 
         // Сетка
         renderer.updateGrid(grid_size2, vert_count2, objs);

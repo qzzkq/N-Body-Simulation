@@ -5,6 +5,8 @@
 #include <iostream>
 #include <cmath>
 
+#define eps 0.001f
+
 namespace {
     constexpr double kG = 6.6743e-11; // гравитац. постоянная для искажения сетки
 }
@@ -80,24 +82,34 @@ void Renderer::drawObjects(const std::vector<Object>& objs) const {
 }
 
 GLuint Renderer::compileProgram(const char* vs, const char* fs) {
-    auto compile = [](GLenum type, const char* src){
+     
+    auto compile = [](GLenum type, const char* src) {
         GLuint s = glCreateShader(type);
         glShaderSource(s, 1, &src, nullptr);
         glCompileShader(s);
-        GLint ok=0; glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
-        if(!ok){ char log[1024]; glGetShaderInfoLog(s,1024,nullptr,log);
+        GLint ok = 0; 
+        glGetShaderiv(s, GL_COMPILE_STATUS, &ok);
+        if (!ok) { 
+            char log[1024]; glGetShaderInfoLog(s,1024,nullptr,log);
             std::cerr << "Shader compile error: " << log << std::endl; }
         return s;
     };
+
     GLuint v = compile(GL_VERTEX_SHADER,   vs);
     GLuint f = compile(GL_FRAGMENT_SHADER, fs);
 
     GLuint p = glCreateProgram();
-    glAttachShader(p, v); glAttachShader(p, f); glLinkProgram(p);
-    GLint ok=0; glGetProgramiv(p, GL_LINK_STATUS, &ok);
-    if(!ok){ char log[1024]; glGetProgramInfoLog(p,1024,nullptr,log);
-        std::cerr << "Program link error: " << log << std::endl; }
-    glDeleteShader(v); glDeleteShader(f);
+    glAttachShader(p, v); 
+    glAttachShader(p, f); 
+    glLinkProgram(p);
+    GLint ok=0; 
+    glGetProgramiv(p, GL_LINK_STATUS, &ok);
+    if (!ok) { 
+        char log[1024]; glGetProgramInfoLog(p, 1024, nullptr, log);
+        std::cerr << "Program link error: " << log << std::endl; 
+    }
+    glDeleteShader(v); 
+    glDeleteShader(f);
     return p;
 }
 
@@ -119,6 +131,7 @@ std::vector<float> Renderer::createGridVertices(float size, int divisions,
             }
         }
     }
+    
     // Y-параллельные
     for (int x=0; x<=divisions; ++x) {
         float xx = -half + x*step;
@@ -131,6 +144,7 @@ std::vector<float> Renderer::createGridVertices(float size, int divisions,
             }
         }
     }
+
     // Z-параллельные
     for (int x=0; x<=divisions; ++x) {
         float xx = -half + x*step;
@@ -165,3 +179,26 @@ std::vector<float> Renderer::createGridVertices(float size, int divisions,
     }
     return vertices;
 }
+
+float Renderer::ComputeFar(glm::vec3& camPos, std::vector<Object>& objs) {
+
+    float maxDist = 0.f; 
+    float dist; 
+
+    for (size_t i = 0; i < objs.size(); ++i) {
+
+        dist = glm::length(camPos - objs[i].position);
+        if (dist < 0) 
+            dist *= -1.f; 
+
+        if (dist > maxDist) 
+            maxDist = dist; 
+
+    }
+
+    if (maxDist > 10000.0f) 
+        maxDist = 10000.0f; 
+
+    return maxDist; 
+
+} 

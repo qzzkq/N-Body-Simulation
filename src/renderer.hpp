@@ -21,6 +21,8 @@ public:
     void drawGrid() const;
     void drawObjects(const std::vector<Object>& objs) const;
 
+    static float ComputeFar(glm::vec3& camPos, std::vector<Object>& objs);
+
 private:
     GLuint program_ = 0;
     GLint  uModel_ = -1, uView_ = -1, uProj_ = -1, uColor_ = -1;
