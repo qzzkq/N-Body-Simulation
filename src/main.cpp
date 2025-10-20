@@ -8,10 +8,13 @@
 #include <optional>
 #include <cmath>
 #include <algorithm>
-
+#include <random>
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
+#ifndef VEL_SCALE
+#define VEL_SCALE 1.0f
+#endif
 
 bool running = true;
 bool pause   = false;
@@ -59,10 +62,63 @@ void main() {
 }
 )glsl";
 
+static inline float RadiusKm(double m, double rho) {
+    const double r_m = cbrt((3.0 * m) / (4.0 * 3.14159265358979323846 * rho));
+    return static_cast<float>(r_m / 50000.0); // ← было /100000.0
+}
+
+void spawnSystem(std::vector<Object>& out, int N, double centralMass, double satMassBase,
+                 float rMin_km, float rMax_km, unsigned seed /*= 42*/)
+{
+    out.clear();
+    out.reserve(static_cast<size_t>(N) + 1);
+
+    Object center(glm::vec3(0), glm::vec3(0), centralMass, 141000.0f, std::nullopt);
+    center.Initalizing = false;
+    center.radius = RadiusKm(center.mass, center.density);
+    center.UpdateVertices();
+    out.push_back(center);
+
+    if (N <= 0) return;
+
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> u01(0.0f, 1.0f);
+    std::uniform_real_distribution<float> uAngle(0.0f, 6.28318530718f);
+
+    const float ringWidth = std::max(0.0f, rMax_km - rMin_km);
+    const float rJitterMax = 0.01f * ringWidth;
+
+    for (int i = 0; i < N; ++i) {
+        float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(N);
+        float r2_min = rMin_km * rMin_km;
+        float r2_max = rMax_km * rMax_km;
+        float r = std::sqrt(r2_min + (r2_max-r2_min)*t);
+
+        r += (u01(rng) * 2.0f - 1.0f) * rJitterMax;
+        r = std::clamp(r, rMin_km, rMax_km);
+
+        float a = uAngle(rng);
+
+        glm::vec3 pos(r * std::cos(a), 0.0f, r * std::sin(a));
+        glm::vec3 tdir(-std::sin(a), 0.0f, std::cos(a));
+
+        double v_circ_mps = std::sqrt((G * centralMass) / (static_cast<double>(r) * 1000.0));
+        float  v_kmps     = static_cast<float>(v_circ_mps / 1000.0f) * VEL_SCALE;
+
+        Object o(pos, tdir * v_kmps, satMassBase, 1410.0f, std::nullopt);
+        o.Initalizing = false;
+        o.radius = RadiusKm(o.mass, o.density);
+        o.UpdateVertices();
+
+        out.push_back(std::move(o));
+    }
+}
+
+
 GLFWwindow* StartGLU();
 
-int main() {
 
+int main() {
     GLFWwindow* window = StartGLU();
     if (!window) {
         std::cerr << "Window or OpenGL context creation failed.\n";
@@ -70,26 +126,14 @@ int main() {
     }
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
-    renderer.setProjection(65.0f, 800.0f/600.0f, 0.1f, 1200.0f);
+    renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
+    double M_central  = static_cast<double>(initMass) * 1000;
+    double M_sat_base = static_cast<double>(initMass); 
 
-objs = {
-    Object(glm::vec3(0.0f, 0.0f, 0.0f),
-           glm::vec3(0.0f, 0.0f, 0.0f),
-           initMass * 1200.0, 141000.0f, std::nullopt),
-
-    Object(glm::vec3( 60.0f, 0.0f,   0.0f),
-           glm::vec3(  100.0f, 0.0f, 0.0f),
-           initMass * 1.0, 1410.0f, std::nullopt),
-    Object(glm::vec3( -120.0f, 0.0f,   0.0f),
-           glm::vec3(  0.0f, 100.0f, 0.0f),
-           initMass * 1.0, 1410.0f, std::nullopt),
-    Object(glm::vec3( -180.0f, 0.0f,   0.0f),
-           glm::vec3(  0.0f, 100.0f, 0.0f),
-           initMass * 1.0, 1410.0f, std::nullopt)
-};
+    spawnSystem(objs, 100000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/30000.0f, /*seed*/42);
 
 
     // Управление 
@@ -121,7 +165,7 @@ objs = {
                 objs.back().UpdateVertices();
             }
         }
-
+        /**
         for (size_t i = 0; i < objs.size(); ++i) {
             Object& obj = objs[i];
             if (obj.Initalizing) {
@@ -145,12 +189,12 @@ objs = {
                 float combinedRadius = obj.radius + obj2.radius;
 
                 float effectiveDistance = std::max(distance, combinedRadius);
-                float dist_m = effectiveDistance * 1000.0f;
-                double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);
-                float acc1 = static_cast<float>(F / obj.mass);
-                float acc2 = static_cast<float>(F / obj2.mass);
-                glm::vec3 accObj = dir * acc1;
-                glm::vec3 accObj2 = -dir * acc2;
+                double dist_m = static_cast<double>(effectiveDistance) * 1000.0;        // м
+                double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);              // Н
+                float acc1_kmps2 = static_cast<float>((F / obj.mass)  / 1000.0);        // км/с²
+                float acc2_kmps2 = static_cast<float>((F / obj2.mass) / 1000.0);        // км/с²
+                glm::vec3 accObj  = dir * acc1_kmps2;
+                glm::vec3 accObj2 = -dir * acc2_kmps2;
 
                 if (!pause) {
                     obj.accelerate(accObj.x, accObj.y, accObj.z, deltaTime);
@@ -190,10 +234,10 @@ objs = {
                 obj.UpdatePos(deltaTime);
             }
         }
-
+        **/
         // Сетка
-        renderer.updateGrid(grid_size2, vert_count2, objs);
-        renderer.drawGrid();
+        // renderer.updateGrid(grid_size2, vert_count2, objs);
+        // renderer.drawGrid();
 
         // Отрисовка 
         renderer.drawObjects(objs);
@@ -204,7 +248,6 @@ objs = {
               timeScale, fps, objs.size());
         glfwSetWindowTitle(window, title);
         glfwSwapBuffers(window);
-
         glfwPollEvents();
     }
 
@@ -218,14 +261,11 @@ objs = {
 
 // Инициализируем контекст openGL
 GLFWwindow* StartGLU() {
-
-    glfwInitHint(GLFW_PLATFORM, GLFW_ANY_PLATFORM);
-
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW\n";
         return nullptr;
     }
-
+    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
     GLFWwindow* window = glfwCreateWindow(800, 600, "3D_TEST", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window.\n";
