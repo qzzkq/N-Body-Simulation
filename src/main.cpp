@@ -133,7 +133,7 @@ int main() {
     double M_central  = static_cast<double>(initMass) * 1000;
     double M_sat_base = static_cast<double>(initMass); 
 
-    spawnSystem(objs, 200000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/30000.0f, /*seed*/42);
+    spawnSystem(objs, 100000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/30000.0f, /*seed*/42);
 
 
     // Управление 
