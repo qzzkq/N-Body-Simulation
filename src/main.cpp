@@ -16,6 +16,7 @@
 #define VEL_SCALE 1.0f
 #endif
 
+
 bool running = true;
 bool pause   = false;
 
@@ -74,6 +75,7 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
     out.reserve(static_cast<size_t>(N) + 1);
 
     Object center(glm::vec3(0), glm::vec3(0), centralMass, 141000.0f, std::nullopt);
+
     center.Initalizing = false;
     center.radius = RadiusKm(center.mass, center.density);
     center.UpdateVertices();
@@ -134,7 +136,8 @@ int main() {
     double M_sat_base = static_cast<double>(initMass); 
 
     spawnSystem(objs, 100000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/30000.0f, /*seed*/42);
-
+    
+    // Чтение с HDF5
 
     // Управление 
     Control control(window, objs,
@@ -165,7 +168,6 @@ int main() {
                 objs.back().UpdateVertices();
             }
         }
-        /**
         for (size_t i = 0; i < objs.size(); ++i) {
             Object& obj = objs[i];
             if (obj.Initalizing) {
@@ -234,7 +236,6 @@ int main() {
                 obj.UpdatePos(deltaTime);
             }
         }
-        **/
         // Сетка
         // renderer.updateGrid(grid_size2, vert_count2, objs);
         // renderer.drawGrid();
