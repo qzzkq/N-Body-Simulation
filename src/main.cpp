@@ -30,11 +30,11 @@ float lastX = 400.0f, lastY = 300.0f;
 float yaw   = -90.0f;
 float pitch = 0.0f;
 
-float deltaTime = 0.0f;
+float dt = 0.0f;
 float lastFrame = 0.0f;
 
 float timeScale = 1.0f; // переменная для ускорения/замедления времени
-
+float fixedDt = 1.0f / 240.0f; // шаг времени;
 float grid_size2  = 400.0f;
 int   vert_count2 = 10;
 
@@ -146,6 +146,78 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 }
 
 
+void simulationStep(std::vector<Object>& objs, float dt, bool pause){
+    for (size_t i = 0; i < objs.size(); ++i) {
+        Object& obj = objs[i];
+        if (obj.Initalizing) {
+            obj.radius = std::pow((3.0 * obj.mass / obj.density) / (4.0 * 3.14159265359), 1.0/3.0) / 100000.0;
+            obj.UpdateVertices();
+        }
+
+        for (size_t j = i + 1; j < objs.size(); ++j) {
+            Object& obj2 = objs[j];
+            if (obj.Initalizing || obj2.Initalizing) {
+                continue;
+            }
+
+            glm::dvec3 delta = obj2.GetPos() - obj.GetPos();
+            double distance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
+            if (distance <= 0.0) {
+                continue;
+            }
+
+            glm::dvec3 dir = delta / distance;
+            double combinedRadius = obj.radius + obj2.radius;
+
+            double effectiveDistance = std::max(distance, combinedRadius);
+            double dist_m = effectiveDistance * 1000.0;        // м
+            double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);              // Н
+            float acc1_kmps2 = static_cast<float>((F / obj.mass)  / 1000.0);        // км/с²
+            float acc2_kmps2 = static_cast<float>((F / obj2.mass) / 1000.0);        // км/с²
+            glm::vec3 accObj  = glm::vec3(dir * static_cast<double>(acc1_kmps2));
+            glm::vec3 accObj2 = glm::vec3(-dir * static_cast<double>(acc2_kmps2));
+
+            if (!pause) {
+                obj.accelerate(accObj.x, accObj.y, accObj.z, dt);
+                obj2.accelerate(accObj2.x, accObj2.y, accObj2.z, dt);
+            }
+
+            if (distance < combinedRadius) {
+                glm::vec3 normal = glm::vec3(dir);
+                glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
+                float relVelAlongNormal = glm::dot(relativeVelocity, normal);
+
+                if (relVelAlongNormal < 0.0f) {
+                    double restitution = 0.8;
+                    double invMass1 = 1.0 / obj.mass;
+                    double invMass2 = 1.0 / obj2.mass;
+                    double impulseScalar = -(1.0 + restitution) * static_cast<double>(relVelAlongNormal) / (invMass1 + invMass2);
+                    glm::dvec3 impulse = glm::dvec3(normal) * impulseScalar;
+                    obj.velocity += impulse * invMass1;
+                    obj2.velocity -= impulse * invMass2;
+                }
+
+                double penetration = combinedRadius - distance;
+                if (penetration > 0.0) {
+                    double invMass1 = 1.0 / obj.mass;
+                    double invMass2 = 1.0 / obj2.mass;
+                    double invMassSum = invMass1 + invMass2;
+                    if (invMassSum > 0.0) {
+                        double correctionScale = penetration / invMassSum;
+                        glm::dvec3 correction = glm::dvec3(normal) * correctionScale;
+                        obj.position -= correction * invMass1;
+                        obj2.position += correction * invMass2;
+                    }
+                }
+            }
+        }
+
+        if (!pause) {
+            obj.UpdatePos(dt);
+        }
+    }
+}
+
 GLFWwindow* StartGLU();
 
 
@@ -161,9 +233,8 @@ int main() {
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
-    bool loaded = true;
+    bool loaded = false;
     char mode;
-    /*
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
@@ -187,125 +258,54 @@ int main() {
 
         }
     }
-    */
+    
     if (!loaded){
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
         
-        spawnSystem(objs, 1000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
+        spawnSystem(objs, 100, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
 
-    LoadObjectsFromFile("data/3bodies.h5", "Particles", objs);
 
     // Чтение с HDF5
 
     // Управление 
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
-                    deltaTime, timeScale, pause, running,
+                    dt, timeScale, pause, running,
                     yaw, pitch, lastX, lastY,
                     initMass);
     control.attach();
 
+    double lastTime = glfwGetTime();
+    double accumulator = 0.0;
     while (!glfwWindowShouldClose(window) && running) {
-        float currentFrame = glfwGetTime();
-        float dtReal = currentFrame - lastFrame;
-        deltaTime = dtReal * timeScale;
-        lastFrame = currentFrame;
+        double now = glfwGetTime();
+        double frameRealDt = now - lastTime;   
+        lastTime = now;
+        frameRealDt *= timeScale;
+        accumulator += frameRealDt;
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        dt = frameRealDt;
 
-        renderer.updateView(cameraPos, cameraFront, cameraUp);
-
-        // Увел. массы объекта при зажатой клавиши
-        if (!objs.empty() && objs.back().Initalizing) {
-            if (glfwGetMouseButton(window, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS) {
-                objs.back().mass *= 1.0 + static_cast<double>(deltaTime);
-                objs.back().radius = std::pow(
-                    (3.0 * objs.back().mass / objs.back().density) / (4.0 * 3.14159265359),
-                    1.0/3.0
-                ) / 100000.0;
-                objs.back().UpdateVertices();
-            }
+        while (accumulator >= fixedDt) {
+            simulationStep(objs, fixedDt, pause);
+            accumulator -= fixedDt;
         }
+
         
-        for (size_t i = 0; i < objs.size(); ++i) {
-            Object& obj = objs[i];
-            if (obj.Initalizing) {
-                obj.radius = std::pow((3.0 * obj.mass / obj.density) / (4.0 * 3.14159265359), 1.0/3.0) / 100000.0;
-                obj.UpdateVertices();
-            }
-
-            for (size_t j = i + 1; j < objs.size(); ++j) {
-                Object& obj2 = objs[j];
-                if (obj.Initalizing || obj2.Initalizing) {
-                    continue;
-                }
-
-                glm::dvec3 delta = obj2.GetPos() - obj.GetPos();
-                double distance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
-                if (distance <= 0.0) {
-                    continue;
-                }
-
-                glm::dvec3 dir = delta / distance;
-                double combinedRadius = obj.radius + obj2.radius;
-
-                double effectiveDistance = std::max(distance, combinedRadius);
-                double dist_m = effectiveDistance * 1000.0;        // м
-                double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);              // Н
-                float acc1_kmps2 = static_cast<float>((F / obj.mass)  / 1000.0);        // км/с²
-                float acc2_kmps2 = static_cast<float>((F / obj2.mass) / 1000.0);        // км/с²
-                glm::vec3 accObj  = glm::vec3(dir * static_cast<double>(acc1_kmps2));
-                glm::vec3 accObj2 = glm::vec3(-dir * static_cast<double>(acc2_kmps2));
-
-                if (!pause) {
-                    obj.accelerate(accObj.x, accObj.y, accObj.z, deltaTime);
-                    obj2.accelerate(accObj2.x, accObj2.y, accObj2.z, deltaTime);
-                }
-
-                if (distance < combinedRadius) {
-                    glm::vec3 normal = glm::vec3(dir);
-                    glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
-                    float relVelAlongNormal = glm::dot(relativeVelocity, normal);
-
-                    if (relVelAlongNormal < 0.0f) {
-                        double restitution = 0.8;
-                        double invMass1 = 1.0 / obj.mass;
-                        double invMass2 = 1.0 / obj2.mass;
-                        double impulseScalar = -(1.0 + restitution) * static_cast<double>(relVelAlongNormal) / (invMass1 + invMass2);
-                        glm::dvec3 impulse = glm::dvec3(normal) * impulseScalar;
-                        obj.velocity += impulse * invMass1;
-                        obj2.velocity -= impulse * invMass2;
-                    }
-
-                    double penetration = combinedRadius - distance;
-                    if (penetration > 0.0) {
-                        double invMass1 = 1.0 / obj.mass;
-                        double invMass2 = 1.0 / obj2.mass;
-                        double invMassSum = invMass1 + invMass2;
-                        if (invMassSum > 0.0) {
-                            double correctionScale = penetration / invMassSum;
-                            glm::dvec3 correction = glm::dvec3(normal) * correctionScale;
-                            obj.position -= correction * invMass1;
-                            obj2.position += correction * invMass2;
-                        }
-                    }
-                }
-            }
-
-            if (!pause) {
-                obj.UpdatePos(deltaTime);
-            }
-        }
+        
         // Сетка
         // renderer.updateGrid(grid_size2, vert_count2, objs);
         // renderer.drawGrid();
 
         // Отрисовка 
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        renderer.updateView(cameraPos, cameraFront, cameraUp);
         renderer.drawObjects(objs);
 
-        float fps = (dtReal > 0.0f) ? 1.0f / dtReal : 0.0f;
+        double dtForFps = frameRealDt / std::max(1.0f, timeScale); 
+        double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
         std::snprintf(title, sizeof(title),
               "3D_TEST | timeScale: %.2fx | FPS: %.0f | Objects =: %zu",
               timeScale, fps, objs.size());
