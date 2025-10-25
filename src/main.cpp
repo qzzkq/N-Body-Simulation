@@ -12,6 +12,7 @@
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
+#include "data/data.hpp"
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
 #endif
