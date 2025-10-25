@@ -68,6 +68,30 @@ static inline float RadiusKm(double m, double rho) {
     return static_cast<float>(r_m / 50000.0); // ← было /100000.0
 }
 
+void сolorFromMass(std::vector<Object>& objs) {
+    float minMass = FLT_MAX; 
+    float maxMass = -1;  
+
+    for (size_t i = 0; i < objs.size() ; i++){
+        Object& obj = objs[i];
+        minMass = (minMass > obj.mass) ? obj.mass : minMass;
+        maxMass = (maxMass < obj.mass) ? obj.mass : maxMass;
+    }
+    for (size_t i = 0; i < objs.size(); i++){
+        Object& obj = objs[i];
+        float m = glm::max(obj.mass, 1e-30f); 
+        float t = (std::log10(m) - std::log10(minMass)) /
+                (std::log10(maxMass) - std::log10(minMass));
+        t = glm::clamp(t, 0.0f, 1.0f);
+
+        const glm::vec3 burgundy = glm::vec3(0.50f, 0.00f, 0.125f);
+        const glm::vec3 white    = glm::vec3(1.00f, 1.00f, 1.00f);
+
+        glm::vec3 rgb = glm::mix(burgundy, white, t);
+        obj.color = glm::vec4(rgb, 1.0f); 
+    }
+}
+
 void spawnSystem(std::vector<Object>& out, int N, double centralMass, double satMassBase,
                  float rMin_km, float rMax_km, unsigned seed /*= 42*/)
 {
@@ -114,6 +138,9 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 
         out.push_back(std::move(o));
     }
+
+    сolorFromMass(out);
+
 }
 
 
@@ -135,7 +162,7 @@ int main() {
     double M_central  = static_cast<double>(initMass) * 1000;
     double M_sat_base = static_cast<double>(initMass); 
 
-    spawnSystem(objs, 100000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/30000.0f, /*seed*/42);
+    spawnSystem(objs, 1000, M_central, M_sat_base, /*rMin*/30.0f, /*rMax*/300.0f, /*seed*/42);
     
     // Чтение с HDF5
 
