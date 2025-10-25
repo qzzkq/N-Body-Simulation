@@ -161,8 +161,9 @@ int main() {
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
-    bool loaded = false;
+    bool loaded = true;
     char mode;
+    /*
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
@@ -181,17 +182,21 @@ int main() {
             if (LoadObjectsFromFile(files[idx-1], "Particles", objs)) {
                 loaded = true;
                 std::cout << "Loaded " << objs.size() << " objects\n";
+                сolorFromMass(objs);
             }
 
         }
     }
-
+    */
     if (!loaded){
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
+        
         spawnSystem(objs, 1000, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
-    
+
+    LoadObjectsFromFile("data/3bodies.h5", "Particles", objs);
+
     // Чтение с HDF5
 
     // Управление 
