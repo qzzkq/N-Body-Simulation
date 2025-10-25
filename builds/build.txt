@@ -1,2 +1,2 @@
 g++ -std=c++17 main.cpp object.cpp renderer.cpp control.cpp    $(pkg-config --cflags --libs glew glfw3) -lGL     -o nBodySim
-h5c++ -std=c++17 main.cpp object.cpp renderer.cpp control.cpp    $(pkg-config --cflags --libs glew glfw3) -lGL     -o nBodySim
+h5c++ -std=c++17 main.cpp object.cpp renderer.cpp control.cpp data/data.cpp -I . $(pkg-config --cflags --libs glew glfw3) -lGL -o nBodySim
