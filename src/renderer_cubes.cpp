@@ -105,10 +105,10 @@ void Renderer::drawObjects(const std::vector<Object>& objs) const {
 
     for (const auto& obj : objs) {
         // Используем obj.radius как половину ребра куба (half-side).
-        float halfSide = glm::max(obj.radius, 0.0001f);
+        float halfSide = glm::max(static_cast<float>(obj.radius), 0.0001f);
 
         glm::mat4 M(1.0f);
-        M = glm::translate(M, obj.position);
+        M = glm::translate(M, glm::vec3(obj.position));
         M = glm::scale(M, glm::vec3(halfSide)); // юнит-куб [-1..1] -> физический куб со стороной 2*radius
         glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
         glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
@@ -189,15 +189,15 @@ std::vector<float> Renderer::createGridVertices(float size, int divisions,
         glm::vec3 p(vertices[i], vertices[i+1], vertices[i+2]);
         glm::vec3 disp(0.0f);
         for (const auto& o : objs) {
-            glm::vec3 d = o.GetPos() - p;
-            float r = glm::length(d);
-            float r_m = r * 1000.0f;
-            if (r_m < 1e-5f) continue; // защита от деления на ноль
-            float strength = float((kG * o.mass) / double(r_m*r_m));
-            glm::vec3 dir = (r > 0.0f) ? d / r : glm::vec3(0);
+            glm::dvec3 d = o.GetPos() - glm::dvec3(p);
+            double r = glm::length(d);
+            double r_m = r * 1000.0;
+            if (r_m < 1e-5) continue; // защита от деления на ноль
+            float strength = float((kG * o.mass) / (r_m*r_m));
+            glm::vec3 dir = (r > 0.0) ? glm::vec3(d / r) : glm::vec3(0);
             glm::vec3 one = dir * strength;
-            if (! (r + glm::length(one) < o.radius * 1000.0f)) {
-                disp += one * (2.0f / glm::max(r, 1e-4f));
+            if (! (r + static_cast<double>(glm::length(one)) < o.radius * 1000.0)) {
+                disp += one * (2.0f / glm::max(static_cast<float>(r), 1e-4f));
             }
         }
         p += disp;

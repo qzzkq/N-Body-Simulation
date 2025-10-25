@@ -10,8 +10,8 @@ class Object {
 public:
     GLuint VAO, VBO;
 
-    glm::vec3 position;
-    glm::vec3 velocity;
+    glm::dvec3 position;
+    glm::dvec3 velocity;
     glm::vec4 color;
 
     size_t vertexCount;
@@ -20,20 +20,20 @@ public:
     bool Launched;
     bool target;
 
-    float mass;
-    float density;
-    float radius;
-    glm::vec3 LastPos;
+    double mass;
+    double density;
+    double radius;
+    glm::dvec3 LastPos;
 
-    Object(glm::vec3 initPosition, glm::vec3 initVelocity,
-           std::optional<float> mass = std::nullopt,
-           std::optional<float> density = std::nullopt,
-           std::optional<float> radius = std::nullopt);
+    Object(glm::dvec3 initPosition, glm::dvec3 initVelocity,
+           std::optional<double> mass = std::nullopt,
+           std::optional<double> density = std::nullopt,
+           std::optional<double> radius = std::nullopt);
 
-    void UpdatePos(float deltaTime);
+    void UpdatePos(double deltaTime);
     void UpdateVertices();
-    glm::vec3 GetPos() const;
-    void accelerate(float x, float y, float z, float deltaTime);
+    glm::dvec3 GetPos() const;
+    void accelerate(double x, double y, double z, double deltaTime);
 
 private:
     std::vector<float> Draw();
