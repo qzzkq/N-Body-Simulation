@@ -2,8 +2,11 @@
 #include <string>
 #include <iostream>
 #include <glm/glm.hpp>
+#include <filesystem>
+#include <cmath>
+#include <algorithm>
 #include "H5Cpp.h"
-
+#include "object.hpp"
 using namespace H5;
 
 struct Particle {
@@ -80,3 +83,46 @@ std::vector<Particle> Reader(const std::string& fileName,
     return out;
 }
 
+std::vector<std::string> ListH5Files(const std::string& dir) {
+    std::vector<std::string> out;
+    namespace fs = std::filesystem;
+    if (!fs::exists(dir)) return out;
+    for (const auto& e : fs::directory_iterator(dir)) {
+        if (e.is_regular_file()) {
+            const auto& p = e.path();
+            if (p.has_extension() && p.extension() == ".h5")
+                out.push_back(p.string());
+        }
+    }
+    std::sort(out.begin(), out.end());
+    return out;
+}
+
+bool LoadObjectsFromFile(const std::string& filePath,        
+                         const std::string& dsetName,
+                         std::vector<Object>& outObjs)
+{
+    auto parts = Reader(filePath, dsetName);
+    if (parts.empty()) return false;
+
+    outObjs.clear();
+    outObjs.reserve(parts.size());
+
+    for (const auto& p : parts) {
+        Object o(glm::vec3(p.position), glm::vec3(p.velocity),
+                 p.mass, /*density*/ std::nullopt, /*radius*/ p.radius);
+        o.Initalizing = false;
+        if (!std::isfinite(o.radius) || o.radius <= 0.0) {
+            if (o.density > 0.0) {
+                constexpr double pi = 3.14159265358979323846;
+                const double r_m = std::cbrt((3.0 * o.mass) / (4.0 * pi * o.density));
+                o.radius = static_cast<float>(r_m / 100000.0);
+            } else {
+                o.radius = 1.0f;
+            }
+        }
+        o.UpdateVertices();
+        outObjs.push_back(std::move(o));
+    }
+    return true;
+}

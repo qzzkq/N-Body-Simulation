@@ -1,2 +1,3 @@
 HDFView
-.vscode
+.vscode/
+/src/data/datacreator.cpp
