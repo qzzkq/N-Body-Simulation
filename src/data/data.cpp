@@ -2,11 +2,8 @@
 #include <string>
 #include <iostream>
 #include <glm/glm.hpp>
-#include <filesystem>
-#include <cmath>
-#include <algorithm>
 #include "H5Cpp.h"
-#include "object.hpp"
+
 using namespace H5;
 
 struct Particle {
