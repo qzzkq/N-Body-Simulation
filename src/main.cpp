@@ -70,25 +70,31 @@ static inline float RadiusKm(double m, double rho) {
     return static_cast<float>(r_m / 50000.0); // ← было /100000.0
 }
 
-void сolorFromMass(std::vector<Object>& objs) {
-    float minMass = FLT_MAX; 
-    float maxMass = -1;  
+void colorFromMass(std::vector<Object>& objs) {
+    double minMass = FLT_MAX; 
+    double maxMass = -1;  
 
     for (size_t i = 0; i < objs.size() ; i++){
         Object& obj = objs[i];
         minMass = (minMass > obj.mass) ? obj.mass : minMass;
         maxMass = (maxMass < obj.mass) ? obj.mass : maxMass;
     }
+
+    const glm::vec3 burgundy = glm::vec3(0.50f, 0.00f, 0.125f);
+    const glm::vec3 white    = glm::vec3(1.00f, 1.00f, 1.00f);
+
+    double denom = std::log10(std::max(1e-30, minMass)) - std::log10(std::max(1e-30, maxMass));
+    if (!std::isfinite(denom) || std::abs(denom) < 1e-12) { 
+        for (auto& o : objs) o.color = glm::vec4(glm::mix(burgundy, white, 0.5f), 1.0f);
+        return;
+    }
+
     for (size_t i = 0; i < objs.size(); i++){
         Object& obj = objs[i];
         float m = glm::max(obj.mass, 1e-30); 
         float t = (std::log10(m) - std::log10(minMass)) /
                 (std::log10(maxMass) - std::log10(minMass));
         t = glm::clamp(t, 0.0f, 1.0f);
-
-        const glm::vec3 burgundy = glm::vec3(0.50f, 0.00f, 0.125f);
-        const glm::vec3 white    = glm::vec3(1.00f, 1.00f, 1.00f);
-
         glm::vec3 rgb = glm::mix(burgundy, white, t);
         obj.color = glm::vec4(rgb, 1.0f); 
     }
@@ -141,7 +147,7 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
         out.push_back(std::move(o));
     }
 
-    сolorFromMass(out);
+    colorFromMass(out);
 
 }
 
@@ -222,6 +228,7 @@ GLFWwindow* StartGLU();
 
 
 int main() {
+
     GLFWwindow* window = StartGLU();
     if (!window) {
         std::cerr << "Window or OpenGL context creation failed.\n";
@@ -251,21 +258,19 @@ int main() {
             size_t idx = 0;
             std::cin >> idx;
             if (LoadObjectsFromFile(files[idx-1], "Particles", objs)) {
+                colorFromMass(objs);
                 loaded = true;
                 std::cout << "Loaded " << objs.size() << " objects\n";
-                сolorFromMass(objs);
             }
 
         }
     }
-    
     if (!loaded){
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
         
         spawnSystem(objs, 100, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
-
 
     // Чтение с HDF5
 
@@ -281,13 +286,19 @@ int main() {
     double accumulator = 0.0;
     while (!glfwWindowShouldClose(window) && running) {
         double now = glfwGetTime();
-        double frameRealDt = now - lastTime;   
+        double frameRealDt = now - lastTime;
+        dt = frameRealDt;    
         lastTime = now;
         frameRealDt *= timeScale;
         accumulator += frameRealDt;
 
-        dt = frameRealDt;
-
+        int substeps = 0;
+        const int MAX_SUBSTEPS = 8;
+        while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS) {
+            simulationStep(objs, fixedDt, pause);
+            accumulator -= fixedDt;
+            ++substeps;
+        }
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
             accumulator -= fixedDt;

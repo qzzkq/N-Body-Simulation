@@ -109,7 +109,7 @@ bool LoadObjectsFromFile(const std::string& filePath,
     outObjs.reserve(parts.size());
 
     for (const auto& p : parts) {
-        Object o(glm::vec3(p.position), glm::vec3(p.velocity),
+        Object o(glm::dvec3(p.position), glm::dvec3(p.velocity),
                  p.mass, /*density*/ std::nullopt, /*radius*/ p.radius);
         o.Initalizing = false;
         if (!std::isfinite(o.radius) || o.radius <= 0.0) {
