@@ -16,6 +16,16 @@ struct Particle {
     double     radius;
 };
 
+std::vector<Object> objs = {};
+double initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
+
+static inline double radiusFromMassDensity(double m, double rho) {
+    constexpr double pi = 3.14159265358979323846;
+    const double r_m = std::cbrt((3.0 * m) / (4.0 * pi * rho));
+    return r_m / 100000.0;
+}
+
+
 static CompType MakeFileType() {
     hsize_t v3[1] = {3};
     ArrayType vec3T(PredType::NATIVE_DOUBLE, 1, v3);
@@ -98,31 +108,40 @@ std::vector<std::string> ListH5Files(const std::string& dir) {
     return out;
 }
 
-bool LoadObjectsFromFile(const std::string& filePath,        
-                         const std::string& dsetName,
-                         std::vector<Object>& outObjs)
-{
-    auto parts = Reader(filePath, dsetName);
-    if (parts.empty()) return false;
 
-    outObjs.clear();
-    outObjs.reserve(parts.size());
+int main() {
 
-    for (const auto& p : parts) {
-        Object o(glm::dvec3(p.position), glm::dvec3(p.velocity),
-                 p.mass, /*density*/ std::nullopt, /*radius*/ p.radius);
-        o.Initalizing = false;
-        if (!std::isfinite(o.radius) || o.radius <= 0.0) {
-            if (o.density > 0.0) {
-                constexpr double pi = 3.14159265358979323846;
-                const double r_m = std::cbrt((3.0 * o.mass) / (4.0 * pi * o.density));
-                o.radius = static_cast<float>(r_m / 100000.0);
-            } else {
-                o.radius = 1.0f;
-            }
-        }
-        o.UpdateVertices();
-        outObjs.push_back(std::move(o));
+    const double initMass = 5.0 * std::pow(10.0, 20.0) / 5.0;
+    const double rho_center = 141000.0;
+    const double rho_sat    = 14100.0;
+
+    std::vector<Particle> parts;
+    parts.reserve(4);
+
+    // центр
+    // спутник 1
+    {
+        double m = initMass * 100.0;
+        parts.push_back({
+            { 60.0, 0.0, 0.0},
+            {0.0, 1.0, 0.0},
+            m,
+            radiusFromMassDensity(m, rho_sat)
+        });
     }
-    return true;
+    // спутник 2
+    {
+        double m = initMass * 100.0;
+        parts.push_back({
+            {0.0, 0.0, 0.0},
+            {  0.0,-1.0, 0.0},
+            m,
+            radiusFromMassDensity(m, rho_sat)
+        });
+    }
+
+
+    Writer("data/3bodies.h5", "Particles", parts);
+    std::cout << "Saved " << parts.size() << " bodies to data/3bodies.h5\n";
+    return 0;
 }
