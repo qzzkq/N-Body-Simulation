@@ -13,6 +13,7 @@
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
+#include "bodysystem.hpp"
 #include "data/data.hpp"
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
@@ -274,6 +275,8 @@ int main() {
 
     // Чтение с HDF5
 
+    BodySystem bodySystem(objs); // создание сохрянем информацию о системе 
+
     // Управление 
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
@@ -302,18 +305,14 @@ int main() {
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
             accumulator -= fixedDt;
-        }
-
-        
-        
-        // Сетка
-        // renderer.updateGrid(grid_size2, vert_count2, objs);
-        // renderer.drawGrid();
+        } 
 
         // Отрисовка 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderer.updateView(cameraPos, cameraFront, cameraUp);
         renderer.drawObjects(objs);
+
+        cameraPos += bodySystem.getVel() * (double) dt;
 
         double dtForFps = frameRealDt / std::max(1.0f, timeScale); 
         double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
