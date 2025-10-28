@@ -17,7 +17,7 @@ BodySystem::BodySystem(std::vector<Object>& objects) : bodies_(objects) {
     
     for (size_t i = 0; i < this->bodiesAmount; ++i) {
         tMass += this->bodies_.at(i).mass;
-        impulse = this->bodies_.at(i).mass * this->bodies_.at(i).velocity; 
+        impulse += this->bodies_.at(i).mass * this->bodies_.at(i).velocity; 
     }
 
     this->systemVel = impulse / tMass; 
@@ -34,7 +34,7 @@ glm::dvec3 BodySystem::getVel() {
     }
     
     for (size_t i = 0; i < this->bodiesAmount; ++i) {
-        impulse = this->bodies_.at(i).mass * this->bodies_.at(i).velocity; 
+        impulse += this->bodies_.at(i).mass * this->bodies_.at(i).velocity; 
     }
 
     this->systemVel = impulse / this->totalMass; 
