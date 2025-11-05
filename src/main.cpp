@@ -10,6 +10,8 @@
 #include <algorithm>
 #include <random>
 #include <filesystem>
+#include <string>
+#include <cctype>
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
@@ -228,7 +230,7 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
 GLFWwindow* StartGLU();
 
 
-int main() {
+int main(int argc, char** argv) {
 
     GLFWwindow* window = StartGLU();
     if (!window) {
@@ -238,6 +240,21 @@ int main() {
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
     renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
+
+    // ← вот это новое: читаем аргумент запуска
+    Renderer::Mode renderMode = Renderer::Mode::Sphere; // по умолчанию – как было
+    if (argc >= 2) {
+        std::string arg = argv[1];
+        for (char &c : arg)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+
+        if (arg == "point" || arg == "points") {
+            renderMode = Renderer::Mode::Points;
+        } else if (arg == "cubes" || arg == "cube") {
+            renderMode = Renderer::Mode::Cubes;
+        }
+    }
+    renderer.setMode(renderMode);
 
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
