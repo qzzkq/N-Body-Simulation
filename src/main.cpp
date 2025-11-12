@@ -277,6 +277,8 @@ int main() {
 
     BodySystem bodySystem(objs); // создание сохрянем информацию о системе 
 
+    bodySystem.transPointToSystem(objs); // переходим в систему объектов
+
     // Управление 
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
@@ -311,8 +313,6 @@ int main() {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderer.updateView(cameraPos, cameraFront, cameraUp);
         renderer.drawObjects(objs);
-
-        cameraPos += bodySystem.getVel() * (double) dt;
 
         double dtForFps = frameRealDt / std::max(1.0f, timeScale); 
         double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;

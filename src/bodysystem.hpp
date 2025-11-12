@@ -11,15 +11,22 @@ class BodySystem {
     public: 
         BodySystem(std::vector<Object>& objects);
         // получение информации о системе  
-        glm::dvec3 getVel(); 
         double getMass(); 
-        std::size_t getBodiesAmount(); 
+        std::size_t getBodiesAmount();
+        glm::dvec3 getVel();
+        glm::dvec3 getCenter(); 
+        void transPointToSystem(std::vector<Object>& objects); // перенос точки отсчёта в центр масс системы 
 
     private: 
-        std::vector<Object>& bodies_; // ссылка на имеющиеся объекты в системе 
+        // поля 
         std::size_t bodiesAmount; // количество объектов 
         glm::dvec3 systemVel; // вектор скорости системы 
+        glm::dvec3 massCenter; // координаты центра масс
         double totalMass; // общая масса системы 
+
+        //приватные методы 
+        void calcParams(std::vector<Object>& objects); // подсчёт параметров системы 
+
 
 }; 
 
