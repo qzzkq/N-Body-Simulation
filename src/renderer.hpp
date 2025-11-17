@@ -8,7 +8,7 @@ class Renderer {
 public:
     // режим визуализации, выбираем его из main
     enum class Mode {
-        Sphere = 0,  // твой исходный вариант: рисуем мешом/треугольниками из VAO
+        Sphere = 0,  // исходный вариант: рисуем треугольниками из VAO
         Points,      // одна точка на объект
         Cubes        // куб вместо объекта
     };
@@ -27,8 +27,6 @@ public:
 
     void drawGrid() const;
     void drawObjects(const std::vector<Object>& objs) const;
-
-    // вот этого не хватало
     void setMode(Mode m) { mode_ = m; }
     Mode getMode() const { return mode_; }
 

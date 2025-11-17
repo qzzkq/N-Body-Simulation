@@ -71,7 +71,6 @@ void Renderer::drawGrid() const {
     glBindVertexArray(0);
 }
 
-// ===== вот тут объединены 3 режима =====
 void Renderer::drawObjects(const std::vector<Object>& objs) const {
     glUseProgram(program_);
 
@@ -141,7 +140,6 @@ void Renderer::drawObjects(const std::vector<Object>& objs) const {
 
     case Mode::Sphere:
     default: {
-        // твой исходный вариант — просто рисуем VAO объекта
         for (const auto& obj : objs) {
             glm::mat4 M(1.0f);
             M = glm::translate(M, glm::vec3(obj.position));
@@ -185,11 +183,5 @@ std::vector<float> Renderer::createGridVertices(float size, int divisions,
     std::vector<float> vertices;
     float step = size / divisions;
     float half = size * 0.5f;
-
-    // ... твой код генерации сетки и смещения (оставь как был) ...
-    // (я его не переписываю тут целиком, у тебя он уже есть в файле)
-    // главное — эта функция должна остаться такой же, как была у тебя.
-    // ↓↓↓
-    // (скопируй сюда свой имеющийся createGridVertices из проекта)
     return vertices;
 }

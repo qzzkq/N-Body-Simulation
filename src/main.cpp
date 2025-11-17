@@ -240,9 +240,7 @@ int main(int argc, char** argv) {
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
     renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
-
-    // ← вот это новое: читаем аргумент запуска
-    Renderer::Mode renderMode = Renderer::Mode::Sphere; // по умолчанию – как было
+    Renderer::Mode renderMode = Renderer::Mode::Sphere;
     if (argc >= 2) {
         std::string arg = argv[1];
         for (char &c : arg)
