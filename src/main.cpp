@@ -272,7 +272,7 @@ int main() {
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
         
-        spawnSystem(objs, 100, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
+        spawnSystem(objs, 500, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
 
     // Чтение с HDF5
