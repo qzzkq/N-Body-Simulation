@@ -15,6 +15,7 @@
 #include "control.hpp"
 #include "bodysystem.hpp"
 #include "data/data.hpp"
+#include "barnes_hut.hpp"
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
 #endif
@@ -153,7 +154,7 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 }
 
 
-void simulationStep(std::vector<Object>& objs, float dt, bool pause){
+/*void simulationStep(std::vector<Object>& objs, float dt, bool pause){
     for (size_t i = 0; i < objs.size(); ++i) {
         Object& obj = objs[i];
         if (obj.Initalizing) {
@@ -224,6 +225,7 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
         }
     }
 }
+*/
 
 GLFWwindow* StartGLU();
 
