@@ -16,8 +16,13 @@
 #include "bodysystem.hpp"
 #include "data/data.hpp"
 #include "barnes_hut.hpp"
+
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
+#endif
+
+#ifdef _WIN32
+#include <windows.h>
 #endif
 
 
@@ -73,8 +78,8 @@ static inline float RadiusKm(double m, double rho) {
 }
 
 void colorFromMass(std::vector<Object>& objs) {
-    double minMass = FLT_MAX; 
-    double maxMass = -1;  
+    double minMass = FLT_MAX;
+    double maxMass = -1;
 
     for (size_t i = 0; i < objs.size() ; i++){
         Object& obj = objs[i];
@@ -86,19 +91,19 @@ void colorFromMass(std::vector<Object>& objs) {
     const glm::vec3 white    = glm::vec3(1.00f, 1.00f, 1.00f);
 
     double denom = std::log10(std::max(1e-30, minMass)) - std::log10(std::max(1e-30, maxMass));
-    if (!std::isfinite(denom) || std::abs(denom) < 1e-12) { 
+    if (!std::isfinite(denom) || std::abs(denom) < 1e-12) {
         for (auto& o : objs) o.color = glm::vec4(glm::mix(burgundy, white, 0.5f), 1.0f);
         return;
     }
 
     for (size_t i = 0; i < objs.size(); i++){
         Object& obj = objs[i];
-        float m = glm::max(obj.mass, 1e-30); 
+        float m = glm::max(obj.mass, 1e-30);
         float t = (std::log10(m) - std::log10(minMass)) /
                 (std::log10(maxMass) - std::log10(minMass));
         t = glm::clamp(t, 0.0f, 1.0f);
         glm::vec3 rgb = glm::mix(burgundy, white, t);
-        obj.color = glm::vec4(rgb, 1.0f); 
+        obj.color = glm::vec4(rgb, 1.0f);
     }
 }
 
@@ -232,6 +237,11 @@ GLFWwindow* StartGLU();
 
 int main() {
 
+#ifdef _WIN32
+    SetConsoleOutputCP(65001);
+    SetConsoleCP(65001);
+#endif
+
     GLFWwindow* window = StartGLU();
     if (!window) {
         std::cerr << "Window or OpenGL context creation failed.\n";
@@ -255,7 +265,7 @@ int main() {
     else{
         simulationStep = &simulationStepBarnesHutCPU;
     }
-    
+
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
@@ -281,7 +291,7 @@ int main() {
     }
     if (!loaded){
         double M_central  = static_cast<double>(initMass) * 1000;
-        double M_sat_base = static_cast<double>(initMass); 
+        double M_sat_base = static_cast<double>(initMass);
         int numObjs;
         std::cout << "Сколько тел загружаем?: " << std::flush;
         std::cin >> numObjs;
@@ -290,11 +300,11 @@ int main() {
 
     // Чтение с HDF5
 
-    BodySystem bodySystem(objs); // создание сохрянем информацию о системе 
+    BodySystem bodySystem(objs); // создание сохрянем информацию о системе
 
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
-    // Управление 
+    // Управление
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
                     dt, timeScale, pause, running,
@@ -307,7 +317,7 @@ int main() {
     while (!glfwWindowShouldClose(window) && running) {
         double now = glfwGetTime();
         double frameRealDt = now - lastTime;
-        dt = frameRealDt;    
+        dt = frameRealDt;
         lastTime = now;
         frameRealDt *= timeScale;
         accumulator += frameRealDt;
@@ -322,14 +332,14 @@ int main() {
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
             accumulator -= fixedDt;
-        } 
+        }
 
-        // Отрисовка 
+        // Отрисовка
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderer.updateView(cameraPos, cameraFront, cameraUp);
         renderer.drawObjects(objs);
 
-        double dtForFps = frameRealDt / std::max(1.0f, timeScale); 
+        double dtForFps = frameRealDt / std::max(1.0f, timeScale);
         double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
         std::snprintf(title, sizeof(title),
               "3D_TEST | timeScale: %.2fx | FPS: %.0f | Objects =: %zu",
