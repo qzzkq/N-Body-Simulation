@@ -15,6 +15,7 @@
 #include "control.hpp"
 #include "bodysystem.hpp"
 #include "data/data.hpp"
+#include "barnes_hut.hpp"
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
 #endif
@@ -153,7 +154,7 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 }
 
 
-void simulationStep(std::vector<Object>& objs, float dt, bool pause){
+void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause){
     for (size_t i = 0; i < objs.size(); ++i) {
         Object& obj = objs[i];
         if (obj.Initalizing) {
@@ -225,6 +226,7 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
     }
 }
 
+
 GLFWwindow* StartGLU();
 
 
@@ -238,11 +240,22 @@ int main() {
 
     Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
     renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
-
+    using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause);
+    Handler simulationStep = nullptr;
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
     bool loaded = false;
     char mode;
+    std::cout << "Выберите алгоритм: брутфорс или Барнс-Хат? [0/1]: " << std::flush;
+    std::cin >> mode;
+    
+    if (mode == '0') {
+        simulationStep = &simulationStepBrutForceCPU;
+    }
+    else{
+        simulationStep = &simulationStepBarnesHutCPU;
+    }
+    
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
@@ -270,7 +283,7 @@ int main() {
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
         
-        spawnSystem(objs, 100, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
+        spawnSystem(objs, 500, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
 
     // Чтение с HDF5
