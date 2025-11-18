@@ -248,7 +248,7 @@ int main() {
     char mode;
     std::cout << "Выберите алгоритм: брутфорс или Барнс-Хат? [0/1]: " << std::flush;
     std::cin >> mode;
-    
+
     if (mode == '0') {
         simulationStep = &simulationStepBrutForceCPU;
     }
@@ -282,8 +282,10 @@ int main() {
     if (!loaded){
         double M_central  = static_cast<double>(initMass) * 1000;
         double M_sat_base = static_cast<double>(initMass); 
-        
-        spawnSystem(objs, 500, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
+        int numObjs;
+        std::cout << "Сколько тел загружаем?: " << std::flush;
+        std::cin >> numObjs;
+        spawnSystem(objs, numObjs, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/70000.0f, /*seed*/42);
     }
 
     // Чтение с HDF5
