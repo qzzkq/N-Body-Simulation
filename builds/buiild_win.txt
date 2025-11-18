@@ -1,9 +1,9 @@
 # В директории с .cpp файлами должны быть dll, находящиеся в папке с nBodySim.exe
 
 
-g++ -std=c++17 main.cpp object.cpp renderer.cpp control.cpp data/data.cpp bodysystem.cpp \
-  -I. -I/mingw64/include -L/mingw64/lib \
-  -lglew32 -lglfw3 -lopengl32 -lgdi32 \
-  -lhdf5 -lhdf5_cpp \
-  -static-libstdc++ -static-libgcc \
-  -o nBodySim.exe
+g++ -std=c++17 main.cpp object.cpp renderer.cpp control.cpp data/data.cpp bodysystem.cpp barnes_hut.cpp \
+    -I. -I/mingw64/include -L/mingw64/lib \
+    -lglew32 -lglfw3 -lopengl32 -lgdi32 \
+    -lhdf5 -lhdf5_cpp \
+    -static-libstdc++ -static-libgcc \
+    -o nBodySim.exe
