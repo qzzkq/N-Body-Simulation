@@ -145,7 +145,7 @@ static void deleteTree(OctreeNode* node) {
     delete node;
 }
 
-void simulationStep(std::vector<Object>& objs, float dt, bool pause) {
+void simulationStepBarnesHutCPU(std::vector<Object>& objs, float dt, bool pause) {
     if (pause || objs.empty()) return;
 
     auto p0 = objs[0].GetPos();
