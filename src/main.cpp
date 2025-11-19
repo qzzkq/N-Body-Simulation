@@ -3,6 +3,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+
 #include <vector>
 #include <iostream>
 #include <optional>
@@ -10,15 +11,17 @@
 #include <algorithm>
 #include <random>
 #include <filesystem>
+#include <cfloat>
+
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
 #include "bodysystem.hpp"
-#include "data/data.hpp"
+#include "data.hpp"
+
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
 #endif
-
 
 bool running = true;
 bool pause   = false;
@@ -34,10 +37,8 @@ float pitch = 0.0f;
 float dt = 0.0f;
 float lastFrame = 0.0f;
 
-float timeScale = 1.0f; // переменная для ускорения/замедления времени
-float fixedDt = 1.0f / 240.0f; // шаг времени;
-float grid_size2  = 400.0f;
-int   vert_count2 = 10;
+float timeScale = 1.0f;          // переменная для ускорения/замедления времени
+float fixedDt   = 1.0f / 240.0f; // шаг времени
 
 const double G = 6.6743e-11;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
@@ -68,12 +69,12 @@ void main() {
 
 static inline float RadiusKm(double m, double rho) {
     const double r_m = cbrt((3.0 * m) / (4.0 * 3.14159265358979323846 * rho));
-    return static_cast<float>(r_m / 50000.0); // ← было /100000.0
+    return static_cast<float>(r_m / 50000.0);
 }
 
 void colorFromMass(std::vector<Object>& objs) {
     double minMass = FLT_MAX; 
-    double maxMass = -1;  
+    double maxMass = -1.0;  
 
     for (size_t i = 0; i < objs.size() ; i++){
         Object& obj = objs[i];
@@ -94,7 +95,7 @@ void colorFromMass(std::vector<Object>& objs) {
         Object& obj = objs[i];
         float m = glm::max(obj.mass, 1e-30); 
         float t = (std::log10(m) - std::log10(minMass)) /
-                (std::log10(maxMass) - std::log10(minMass));
+                  (std::log10(maxMass) - std::log10(minMass));
         t = glm::clamp(t, 0.0f, 1.0f);
         glm::vec3 rgb = glm::mix(burgundy, white, t);
         obj.color = glm::vec4(rgb, 1.0f); 
@@ -120,14 +121,14 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
     std::uniform_real_distribution<float> u01(0.0f, 1.0f);
     std::uniform_real_distribution<float> uAngle(0.0f, 6.28318530718f);
 
-    const float ringWidth = std::max(0.0f, rMax_km - rMin_km);
+    const float ringWidth  = std::max(0.0f, rMax_km - rMin_km);
     const float rJitterMax = 0.01f * ringWidth;
 
     for (int i = 0; i < N; ++i) {
         float t = (static_cast<float>(i) + 0.5f) / static_cast<float>(N);
         float r2_min = rMin_km * rMin_km;
         float r2_max = rMax_km * rMax_km;
-        float r = std::sqrt(r2_min + (r2_max-r2_min)*t);
+        float r = std::sqrt(r2_min + (r2_max - r2_min) * t);
 
         r += (u01(rng) * 2.0f - 1.0f) * rJitterMax;
         r = std::clamp(r, rMin_km, rMax_km);
@@ -136,7 +137,6 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 
         glm::vec3 pos(r * std::cos(a), 0.0f, r * std::sin(a));
         glm::vec3 tdir(-std::sin(a), 0.0f, std::cos(a));
-
         double v_circ_mps = std::sqrt((G * centralMass) / (static_cast<double>(r) * 1000.0));
         float  v_kmps     = static_cast<float>(v_circ_mps / 1000.0f) * VEL_SCALE;
 
@@ -149,11 +149,14 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
     }
 
     colorFromMass(out);
-
 }
 
+double gSimTime = 0.0;
 
 void simulationStep(std::vector<Object>& objs, float dt, bool pause){
+    if (!pause) {
+        gSimTime += dt;
+    }
     for (size_t i = 0; i < objs.size(); ++i) {
         Object& obj = objs[i];
         if (obj.Initalizing) {
@@ -188,7 +191,6 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
                 obj.accelerate(accObj.x, accObj.y, accObj.z, dt);
                 obj2.accelerate(accObj2.x, accObj2.y, accObj2.z, dt);
             }
-
             if (distance < combinedRadius) {
                 glm::vec3 normal = glm::vec3(dir);
                 glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
@@ -226,7 +228,6 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
 }
 
 GLFWwindow* StartGLU();
-
 
 int main() {
 
@@ -273,13 +274,15 @@ int main() {
         spawnSystem(objs, 100, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/700.0f, /*seed*/42);
     }
 
-    // Чтение с HDF5
+    // Открываем файл для записи серии кадров и сразу пишем начальный кадр
+    H5::H5File framesFile = OpenFramesFile("output.h5", objs.size());
+    std::size_t frameIndex = 0;
+    WriteFrame(framesFile, objs, gSimTime, frameIndex);
+    ++frameIndex;
 
-    BodySystem bodySystem(objs); // создание сохрянем информацию о системе 
-
+    BodySystem bodySystem(objs); // создание, сохраняем информацию о системе 
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
-    // Управление 
     Control control(window, objs,
                     cameraPos, cameraFront, cameraUp,
                     dt, timeScale, pause, running,
@@ -289,6 +292,7 @@ int main() {
 
     double lastTime = glfwGetTime();
     double accumulator = 0.0;
+
     while (!glfwWindowShouldClose(window) && running) {
         double now = glfwGetTime();
         double frameRealDt = now - lastTime;
@@ -307,7 +311,13 @@ int main() {
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
             accumulator -= fixedDt;
-        } 
+        }
+
+        // Запись кадра, если симуляция не на паузе
+        if (!pause) {
+            WriteFrame(framesFile, objs, gSimTime, frameIndex);
+            ++frameIndex;
+        }
 
         // Отрисовка 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -328,6 +338,9 @@ int main() {
         glDeleteVertexArrays(1, &obj.VAO);
         glDeleteBuffers(1, &obj.VBO);
     }
+
+    FinalizeFramesFile(framesFile, frameIndex);
+
     glfwTerminate();
     return 0;
 }
@@ -353,7 +366,6 @@ GLFWwindow* StartGLU() {
         glfwTerminate();
         return nullptr;
     }
-
     glEnable(GL_DEPTH_TEST);
     glViewport(0, 0, 800, 600);
     glEnable(GL_BLEND);
