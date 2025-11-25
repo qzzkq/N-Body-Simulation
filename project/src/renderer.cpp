@@ -52,25 +52,6 @@ void Renderer::updateView(const glm::vec3& pos,
     glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(V));
 }
 
-void Renderer::updateGrid(float size, int divisions, const std::vector<Object>& objs) {
-    auto verts = createGridVertices(size, divisions, objs);
-    gridVertexCount_ = verts.size() / 3;
-
-    glBindBuffer(GL_ARRAY_BUFFER, gridVBO_);
-    glBufferData(GL_ARRAY_BUFFER, verts.size()*sizeof(float), verts.data(), GL_DYNAMIC_DRAW);
-}
-
-void Renderer::drawGrid() const {
-    glUseProgram(program_);
-    glm::mat4 M(1.0f);
-    glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-    glUniform4f(uColor_, 1.0f, 1.0f, 1.0f, 0.25f);
-
-    glBindVertexArray(gridVAO_);
-    glDrawArrays(GL_LINES, 0, static_cast<GLint>(gridVertexCount_));
-    glBindVertexArray(0);
-}
-
 void Renderer::drawObjects(const std::vector<Object>& objs) const {
     glUseProgram(program_);
 
@@ -176,12 +157,4 @@ GLuint Renderer::compileProgram(const char* vs, const char* fs) {
     glDeleteShader(v);
     glDeleteShader(f);
     return p;
-}
-
-std::vector<float> Renderer::createGridVertices(float size, int divisions,
-                                                const std::vector<Object>& objs) {
-    std::vector<float> vertices;
-    float step = size / divisions;
-    float half = size * 0.5f;
-    return vertices;
 }

@@ -14,7 +14,7 @@
 #include "renderer.hpp"
 #include "control.hpp"
 #include "bodysystem.hpp"
-#include "data/data.hpp"
+#include "data.hpp"
 #include "barnes_hut.hpp"
 
 #ifndef VEL_SCALE

@@ -23,9 +23,6 @@ public:
                     const glm::vec3& front,
                     const glm::vec3& up);
 
-    void updateGrid(float size, int divisions, const std::vector<Object>& objs);
-
-    void drawGrid() const;
     void drawObjects(const std::vector<Object>& objs) const;
     void setMode(Mode m) { mode_ = m; }
     Mode getMode() const { return mode_; }
@@ -41,6 +38,4 @@ private:
     Mode mode_ = Mode::Sphere;
 
     static GLuint compileProgram(const char* vs, const char* fs);
-    static std::vector<float> createGridVertices(float size, int divisions,
-                                                 const std::vector<Object>& objs);
 };
