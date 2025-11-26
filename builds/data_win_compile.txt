@@ -1,0 +1,1 @@
+g++ datacreator.cpp -o datacreator.exe     -std=c++17     -I/mingw64/include     -L/mingw64/lib     -lhdf5_cpp -lhdf5
