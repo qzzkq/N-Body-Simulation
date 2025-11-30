@@ -28,23 +28,24 @@ std::vector<Particle> Reader(const std::string& fileName,
 // Список .h5 файлов в каталоге (по умолчанию "data")
 std::vector<std::string> ListH5Files(const std::string& dir = "data");
 
-// Грузим объекты из файла (через Reader)
+// Грузим объекты из файла (через Reader, датасет "Particles")
 bool LoadObjectsFromFile(const std::string& filePath,
                          const std::string& dsetName,
                          std::vector<Object>& outObjs);
 
-// Открыть файл для серии кадров (затирает старый файл)
+// ---------- Серийная запись кадров (для реплея) ----------
 H5::H5File OpenFramesFile(const std::string& fileName,
                           std::size_t numBodies);
 
-// Записать один кадр: frame_000000, frame_000001, и тд
+// Записать один кадр: 
+//   frame_000000  -> pos + mass + radius
+//   frame_000001+ -> только pos
 void WriteFrame(H5::H5File& file,
                 const std::vector<Object>& objs,
                 double t,
                 std::size_t frameIndex,
                 const std::string& prefix = "frame");
 
-// В конце симуляции обновить атрибут num_frames
 void FinalizeFramesFile(H5::H5File& file,
                         std::size_t numFrames);
 

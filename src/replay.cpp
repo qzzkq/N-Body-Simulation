@@ -67,6 +67,25 @@ GLFWwindow* StartGLU() {
     return window;
 }
 
+// ===== тип первого кадра: position + mass + radius =====
+struct Frame0Record {
+    glm::dvec3 position;
+    double     mass;
+    double     radius;
+};
+
+static H5::CompType MakeFrame0TypeReplay()
+{
+    hsize_t v3dims[1] = {3};
+    H5::ArrayType vec3Type(H5::PredType::NATIVE_DOUBLE, 1, v3dims);
+
+    H5::CompType t(sizeof(Frame0Record));
+    t.insertMember("position", HOFFSET(Frame0Record, position), vec3Type);
+    t.insertMember("mass",     HOFFSET(Frame0Record, mass),     H5::PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   HOFFSET(Frame0Record, radius),   H5::PredType::NATIVE_DOUBLE);
+    return t;
+}
+
 int main(int argc, char** argv) {
     if (argc < 2) {
         std::cerr << "Использование: " << argv[0] << " output.h5\n";
@@ -75,57 +94,51 @@ int main(int argc, char** argv) {
 
     std::string fileName = argv[1];
 
-    // --- DETECT: считаем количество фреймов по наличию датасетов frame_XXXXXX ---
+    H5::H5File file(fileName, H5F_ACC_RDONLY);
 
+    // === детектируем количество кадров по наличию frame_XXXXXX ===
     std::size_t numFrames = 0;
-    std::size_t numBodies = 0;
-    std::vector<Particle> firstFrameParts;
-
     while (true) {
         char dsetName[64];
         std::snprintf(dsetName, sizeof(dsetName), "frame_%06zu", numFrames);
-
         try {
-            auto parts = Reader(fileName, dsetName);
-            if (parts.empty()) {
-                break;
-            }
-
-            if (numFrames == 0) {
-                numBodies = parts.size();
-                firstFrameParts = parts; // копируем начальный кадр
-            } else {
-                if (parts.size() != numBodies) {
-                    std::cerr << "Кадр " << dsetName
-                              << " имеет " << parts.size()
-                              << " тел, а первый кадр имел " << numBodies << "\n";
-                    return 1;
-                }
-            }
-
+            file.openDataSet(dsetName).close();
             ++numFrames;
-        }
-        catch (const H5::Exception&) {
-            // датасета с таким именем нет → все фреймы закончились
+        } catch (const H5::Exception&) {
             break;
-        }
-        catch (const std::exception& e) {
-            std::cerr << "Ошибка при чтении " << dsetName << ": " << e.what() << "\n";
-            return 1;
         }
     }
 
-    if (numFrames == 0 || numBodies == 0) {
+    if (numFrames == 0) {
         std::cerr << "В файле " << fileName
                   << " не найдено ни одного кадра frame_XXXXXX.\n";
         return 1;
     }
 
-    std::cout << "Файл: " << fileName
-              << "\n  num_bodies (детект) = " << numBodies
-              << "\n  num_frames (детект) = " << numFrames << "\n";
+    // === читаем первый кадр (position + mass + radius) ===
+    char firstName[64];
+    std::snprintf(firstName, sizeof(firstName), "frame_%06d", 0);
 
-    // --- OpenGL / окно ---
+    H5::DataSet ds0 = file.openDataSet(firstName);
+    H5::DataSpace sp0 = ds0.getSpace();
+
+    hsize_t dims[1] = {0};
+    sp0.getSimpleExtentDims(dims);
+    std::size_t numBodies = static_cast<std::size_t>(dims[0]);
+    if (numBodies == 0) {
+        std::cerr << "Первый кадр пустой.\n";
+        return 1;
+    }
+
+    std::vector<Frame0Record> firstFrame(numBodies);
+    H5::CompType t0 = MakeFrame0TypeReplay();
+    ds0.read(firstFrame.data(), t0);
+
+    std::cout << "Файл: " << fileName
+              << "\n  num_bodies (detected) = " << numBodies
+              << "\n  num_frames (detected) = " << numFrames << "\n";
+
+    // === OpenGL / окно ===
     GLFWwindow* window = StartGLU();
     if (!window) {
         return 1;
@@ -138,20 +151,18 @@ int main(int argc, char** argv) {
     glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
     glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
-    // --- Создаём объекты по первому кадру ---
-
+    // === создаём объекты по первому кадру ===
     std::vector<Object> objs;
     objs.reserve(numBodies);
-    for (const auto& p : firstFrameParts) {
-        Object o(p.position, p.velocity,
-                 p.mass,            // mass
-                 1410.0f,           // плотность как в spawnSystem
-                 std::nullopt);     // radius потом зададим
-
+    for (const auto& r : firstFrame) {
+        Object o(r.position,
+                 glm::dvec3(0.0),  // скорость в реплее не нужна
+                 r.mass,
+                 1410.0f,
+                 std::nullopt);
         o.Initalizing = false;
-        if (std::isfinite(p.radius) && p.radius > 0.0) {
-            o.radius = static_cast<float>(p.radius);
-        } else {
+        o.radius = static_cast<float>(r.radius);
+        if (!std::isfinite(o.radius) || o.radius <= 0.0f) {
             o.radius = 1.0f;
         }
         o.UpdateVertices();
@@ -165,15 +176,18 @@ int main(int argc, char** argv) {
 
     char title[128];
 
+    // тип для последующих кадров (только position)
+    hsize_t v3dims[1] = {3};
+    H5::ArrayType vec3Type(H5::PredType::NATIVE_DOUBLE, 1, v3dims);
+
     while (!glfwWindowShouldClose(window)) {
         double now = glfwGetTime();
 
-        // переключаем кадр раз в framePeriod секунд
         if (now - lastSwitch >= framePeriod) {
             currentFrame++;
             if (currentFrame >= numFrames) {
-                currentFrame = numFrames - 1; // тормозим на последнем
-                // если хочешь цикл по кругу:
+                currentFrame = numFrames - 1; // стоп на последнем
+                // или по кругу:
                 // currentFrame = 0;
             }
 
@@ -182,19 +196,22 @@ int main(int argc, char** argv) {
                           "frame_%06zu", currentFrame);
 
             try {
-                auto parts = Reader(fileName, dsetName);
-                if (parts.size() != objs.size()) {
+                H5::DataSet dset = file.openDataSet(dsetName);
+                H5::DataSpace sp = dset.getSpace();
+
+                hsize_t dimsPos[1] = {0};
+                sp.getSimpleExtentDims(dimsPos);
+                if (dimsPos[0] != numBodies) {
                     std::cerr << "Размер кадра " << dsetName
-                              << " не совпадает с количеством объектов\n";
+                              << " не совпадает с numBodies\n";
                     break;
                 }
 
+                std::vector<glm::dvec3> pos(numBodies);
+                dset.read(pos.data(), vec3Type);
+
                 for (std::size_t i = 0; i < objs.size(); ++i) {
-                    objs[i].position = parts[i].position;
-                    objs[i].velocity = parts[i].velocity;
-                    if (std::isfinite(parts[i].radius) && parts[i].radius > 0.0) {
-                        objs[i].radius = static_cast<float>(parts[i].radius);
-                    }
+                    objs[i].position = pos[i];
                     objs[i].UpdateVertices();
                 }
             }

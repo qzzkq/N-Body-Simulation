@@ -205,7 +205,6 @@ void simulationStep(std::vector<Object>& objs, float dt, bool pause){
                     obj.velocity += impulse * invMass1;
                     obj2.velocity -= impulse * invMass2;
                 }
-
                 double penetration = combinedRadius - distance;
                 if (penetration > 0.0) {
                     double invMass1 = 1.0 / obj.mass;

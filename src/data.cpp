@@ -90,6 +90,7 @@ std::vector<Particle> Reader(const std::string& fileName,
     }
 }
 
+
 std::vector<std::string> ListH5Files(const std::string& dir)
 {
     std::vector<std::string> files;
@@ -116,6 +117,7 @@ std::vector<std::string> ListH5Files(const std::string& dir)
     return files;
 }
 
+
 bool LoadObjectsFromFile(const std::string& filePath,
                          const std::string& dsetName,
                          std::vector<Object>& outObjs)
@@ -139,18 +141,17 @@ bool LoadObjectsFromFile(const std::string& filePath,
     outObjs.reserve(parts.size());
 
     for (const auto& p : parts) {
+        // Конструируем Object.
         Object o(p.position, p.velocity,
                  p.mass,            // mass
-                 1410.0f,           // density
-                 std::nullopt);     // radius пока не задаём явно
+                 1410.0f,           // density (как в spawnSystem)
+                 std::nullopt);     // radius – позже уточним
 
         o.Initalizing = false;
 
-        // Если в файле есть валидный радиус — используем его.
         if (std::isfinite(p.radius) && p.radius > 0.0) {
             o.radius = static_cast<float>(p.radius);
         } else {
-            // Иначе пробуем вычислить из массы и плотности.
             if (o.density > 0.0) {
                 constexpr double pi = 3.14159265358979323846;
                 const double r_m = std::cbrt((3.0 * o.mass) / (4.0 * pi * o.density));
@@ -167,10 +168,38 @@ bool LoadObjectsFromFile(const std::string& filePath,
     return true;
 }
 
+// frame_000000: position + mass + radius
+// frame_000001+: только position
+
+struct Frame0Record {
+    glm::dvec3 position;
+    double     mass;
+    double     radius;
+};
+
+static CompType MakeFrame0Type()
+{
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+
+    CompType t(sizeof(Frame0Record));
+    t.insertMember("position", HOFFSET(Frame0Record, position), vec3Type);
+    t.insertMember("mass",     HOFFSET(Frame0Record, mass),     PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   HOFFSET(Frame0Record, radius),   PredType::NATIVE_DOUBLE);
+    return t;
+}
+
+static CompType& GetFrame0Type()
+{
+    static CompType t = MakeFrame0Type();
+    return t;
+}
+
 H5::H5File OpenFramesFile(const std::string& fileName,
                           std::size_t numBodies)
 {
     H5::H5File file(fileName, H5F_ACC_TRUNC);
+
     hsize_t dims[1] = {1};
     H5::DataSpace scalar(1, dims);
 
@@ -204,50 +233,69 @@ void WriteFrame(H5::H5File& file,
                 const std::string& prefix)
 {
     if (objs.empty()) return;
-    std::vector<Particle> parts;
-    parts.reserve(objs.size());
-    for (const auto& o : objs) {
-        Particle p;
-        p.position = o.position;
-        p.velocity = o.velocity;
-        p.mass     = o.mass;
-        p.radius   = o.radius;
-        parts.push_back(p);
-    }
-
-    H5::CompType& type = GetParticleType();
-
-    hsize_t dims[1] = { static_cast<hsize_t>(parts.size()) };
-    H5::DataSpace space(1, dims);
 
     char name[64];
     std::snprintf(name, sizeof(name), "%s_%06zu",
                   prefix.c_str(), frameIndex);
 
-    H5::DataSet dset = file.createDataSet(name, type, space);
+    hsize_t dims[1] = { static_cast<hsize_t>(objs.size()) };
+    H5::DataSpace space(1, dims);
 
-    dset.write(parts.data(), type);
+    if (frameIndex == 0) {
+        std::vector<Frame0Record> recs;
+        recs.reserve(objs.size());
+        for (const auto& o : objs) {
+            Frame0Record r;
+            r.position = o.position;
+            r.mass     = o.mass;
+            r.radius   = o.radius;
+            recs.push_back(r);
+        }
 
-    // Атрибут времени кадра t
-    H5::DataSpace scalar(H5S_SCALAR);
-    H5::Attribute tAttr = dset.createAttribute(
-        "t",
-        H5::PredType::NATIVE_DOUBLE,
-        scalar
-    );
-    tAttr.write(H5::PredType::NATIVE_DOUBLE, &t);
+        H5::CompType& type = GetFrame0Type();
+        H5::DataSet dset = file.createDataSet(name, type, space);
+        dset.write(recs.data(), type);
+        H5::DataSpace scalar(H5S_SCALAR);
+        H5::Attribute tAttr = dset.createAttribute(
+            "t",
+            H5::PredType::NATIVE_DOUBLE,
+            scalar
+        );
+        tAttr.write(H5::PredType::NATIVE_DOUBLE, &t);
+    } else {
+        std::vector<glm::dvec3> pos;
+        pos.reserve(objs.size());
+        for (const auto& o : objs) {
+            pos.push_back(o.position);
+        }
 
-    // Сразу выталкиваем данные на диск
+        hsize_t v3dims[1] = {3};
+        H5::ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+
+        H5::DataSet dset = file.createDataSet(name, vec3Type, space);
+        dset.write(pos.data(), vec3Type);
+
+        H5::DataSpace scalar(H5S_SCALAR);
+        H5::Attribute tAttr = dset.createAttribute(
+            "t",
+            H5::PredType::NATIVE_DOUBLE,
+            scalar
+        );
+        tAttr.write(H5::PredType::NATIVE_DOUBLE, &t);
+    }
+
     file.flush(H5F_SCOPE_GLOBAL);
 }
 
 void FinalizeFramesFile(H5::H5File& file,
                         std::size_t numFrames)
 {
-    // Перезаписываем num_frames
-    H5::Attribute aNf = file.openAttribute("num_frames");
-    hsize_t nf = static_cast<hsize_t>(numFrames);
-    aNf.write(H5::PredType::NATIVE_HSIZE, &nf);
-
-    file.flush(H5F_SCOPE_GLOBAL);
+    try {
+        H5::Attribute aNf = file.openAttribute("num_frames");
+        hsize_t nf = static_cast<hsize_t>(numFrames);
+        aNf.write(H5::PredType::NATIVE_HSIZE, &nf);
+        file.flush(H5F_SCOPE_GLOBAL);
+    } catch (const H5::Exception& e) {
+        std::cerr << "FinalizeFramesFile error: " << e.getDetailMsg() << "\n";
+    }
 }
