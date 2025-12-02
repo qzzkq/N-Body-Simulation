@@ -266,12 +266,20 @@ int main() {
             break;
         case 2:
             simulationStep = &simulationStepBarnesHutCPU;
+            break;
+        case 3:
+            simulationStep = &simulationStepBarnesHutCUDA;
+            break;
+        default:
+            std::cout << "Неверный выбор, используем брутфорс.\n";
+            simulationStep = &simulationStepBrutForceCPU;
+            break;
     }
 
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
-    if (mode == '0'){
+    if (mode == 0){
         auto files = ListH5Files("data");
         if (files.empty()){
             std::cout << "В ./data нет .h5 файлов. Генерируем рандомно.\n";

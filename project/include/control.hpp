@@ -27,13 +27,11 @@ public:
 private:
     // Статические обёртки для GLFW
     static void KeyCB(GLFWwindow* w, int key, int scancode, int action, int mods);
-    static void MouseButtonCB(GLFWwindow* w, int button, int action, int mods);
     static void ScrollCB(GLFWwindow* w, double xoffset, double yoffset);
     static void CursorPosCB(GLFWwindow* w, double xpos, double ypos);
 
     // Реальная логика обработчиков
     void onKey(int key, int scancode, int action, int mods);
-    void onMouseButton(int button, int action, int mods);
     void onScroll(double xoffset, double yoffset);
     void onCursorPos(double xpos, double ypos);
 
