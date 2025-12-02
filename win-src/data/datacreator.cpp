@@ -112,118 +112,65 @@ std::vector<std::string> ListH5Files(const std::string& dir) {
 int main() {
     std::vector<Particle> parts;
 
-    // --- Реальные массы (кг), только для ОТНОСИТЕЛЬНЫХ соотношений ---
-    const double mass_sun     = 1.9885e30;
-    const double mass_mercury = 3.3011e23;
-    const double mass_venus   = 4.8675e24;
-    const double mass_earth   = 5.97237e24;
-    const double mass_mars    = 6.4171e23;
-    const double mass_jupiter = 1.8982e27;
-    const double mass_saturn  = 5.6834e26;
-    const double mass_uranus  = 8.6810e25;
-    const double mass_neptune = 1.02413e26;
+    const double MASS_REF = 1.0e22;
+    const double DIST_REF = 60.0;
+    const double V_REF    = 1.0;
 
-    // Средние расстояния от Солнца (в а.е.)
-    const double a_mercury = 0.387;
-    const double a_venus   = 0.723;
-    const double a_earth   = 1.0;
-    const double a_mars    = 1.524;
-    const double a_jupiter = 5.203;
-    const double a_saturn  = 9.537;
-    const double a_uranus  = 19.191;
-    const double a_neptune = 30.07;
+    const double MASS_HEAVY = MASS_REF;
+    const double MASS_OUTER = MASS_REF * 0.001;
 
-    // --- Эталонные единицы из рабочего 3bodies-примера ---
-    const double MASS_REF = 1.0e22;  // масса "типичного" тела в исходном примере
-    const double DIST_REF = 60.0;    // расстояние между телами в исходном примере
-    const double V_REF    = 1.0;     // скорость в исходном примере
+    const double R_HEAVY = 2.5;
+    const double R_OUTER = 1.5;
 
-    // Масштаб масс: делаем так, чтобы Солнце имело массу MASS_REF
-    const double MASS_SCALE = MASS_REF / mass_sun;
-
-    auto mass_sim = [&](double m_real) {
-        return m_real * MASS_SCALE;
+    auto estimate_circular_velocity = [&](double r) {
+        return V_REF * std::sqrt(2.0 * DIST_REF / r);
     };
 
-    // Масштаб расстояния: Земля -> радиус = DIST_REF (как в 3bodies)
-    const double DIST_SCALE = DIST_REF / a_earth;  // = 60.0
+    const double r_pair  = 20.0;
+    const double R_orbit = r_pair * 0.5;
 
-    // Радиусы чисто визуальные
-    const double radius_sun_sim    = 4.0;
-    const double radius_planet_sim = 1.0;
+    double v_single = estimate_circular_velocity(r_pair);
+    double v_binary = 0.5 * v_single;
 
-    // Коэффициент по скорости: чуть меньше "круговой" — устойчивые эллипсы
-    const double V_FACTOR = 0.8;
-
-    // Приближённая оценка "круговой" скорости в тех же юнитах, что и в 3bodies:
-    // v_circ ≈ V_REF * sqrt(2 * DIST_REF / r)
-    auto estimate_circular_velocity = [&](double r_sim) {
-        return V_REF * std::sqrt(2.0 * DIST_REF / r_sim);
-    };
-
-    // --- Солнце в центре ---
     {
-        Particle sun;
-        sun.position = glm::dvec3(0.0, 0.0, 0.0);
-        sun.velocity = glm::dvec3(0.0, 0.0, 0.0);
-        sun.mass     = mass_sim(mass_sun);  // == MASS_REF
-        sun.radius   = radius_sun_sim;
-        parts.push_back(sun);
+        Particle a;
+        a.position = glm::dvec3(-R_orbit, 0.0, 0.0);
+        a.velocity = glm::dvec3(0.0, -v_binary, 0.0);
+        a.mass     = MASS_HEAVY;
+        a.radius   = R_HEAVY;
+        parts.push_back(a);
     }
 
-    // Хелпер для добавления планет на (почти) круговые орбиты
-    auto add_planet = [&](double a_AU, double m_real) {
-        double r_sim  = a_AU * DIST_SCALE;          // расстояние в сим-юнитах
-        double v_circ = estimate_circular_velocity(r_sim);
-        double v_sim  = V_FACTOR * v_circ;          // чуть меньше круговой
+    {
+        Particle b;
+        b.position = glm::dvec3(+R_orbit, 0.0, 0.0);
+        b.velocity = glm::dvec3(0.0, +v_binary, 0.0);
+        b.mass     = MASS_HEAVY;
+        b.radius   = R_HEAVY;
+        parts.push_back(b);
+    }
 
-        Particle p;
-        p.position = glm::dvec3(r_sim, 0.0, 0.0);   // на оси X
-        p.velocity = glm::dvec3(0.0,  v_sim, 0.0);  // скорость вдоль +Y
-        p.mass     = mass_sim(m_real);
-        p.radius   = radius_planet_sim;
-        parts.push_back(p);
-    };
+    const double R_outer = 300.0;
 
-    // --- Планеты ---
-    add_planet(a_mercury, mass_mercury);
-    add_planet(a_venus,   mass_venus);
-    add_planet(a_earth,   mass_earth);
-    add_planet(a_mars,    mass_mars);
-    add_planet(a_jupiter, mass_jupiter);
-    add_planet(a_saturn,  mass_saturn);
-    add_planet(a_uranus,  mass_uranus);
-    add_planet(a_neptune, mass_neptune);
+    Particle c;
+    c.position = glm::dvec3(0.0, R_outer, 0.0);
 
-    // --- ТЯЖЁЛОЕ ПРОЛЁТНОЕ ТЕЛО ("чёрная дыра" или звезда-нарушитель) ---
+    double v_circ_base  = estimate_circular_velocity(R_outer);
+    double v_circ_outer = std::sqrt(2.0) * v_circ_base;
 
-    // Пусть оно в 5 раз тяжелее Солнца по массе:
-    const double mass_intruder_real = 5.0 * mass_sun;
+    double v_outer = 1.1 * v_circ_outer;
 
-    Particle intr;
-    intr.mass   = mass_sim(mass_intruder_real); // ~ 5 * MASS_REF
-    intr.radius = 3.0;
+    c.velocity = glm::dvec3(-v_outer, 0.0, 0.0);
 
-    // Стартовая позиция: снаружи орбиты Сатурна, на окраине системы
-    // Немного смещаем по X и Y, чтобы траектория прошла "насквозь"
-    intr.position = glm::dvec3(-500.0, 300.0, 0.0);
+    c.mass   = MASS_OUTER;
+    c.radius = R_OUTER;
+    parts.push_back(c);
 
-    // Скорость направлена примерно к центру,
-    // по величине сравнима со скоростями планет.
-    intr.velocity = glm::dvec3(1.0, -0.5, 0.0);
-
-    parts.push_back(intr);
-
-    // --- Запись HDF5 ---
-    Writer("data/solar_system_intruder.h5", "Particles", parts);
+    Writer("data/three_body_hierarchical_testparticle.h5", "Particles", parts);
     std::cout << "Saved " << parts.size()
-              << " bodies to data/solar_system_intruder.h5\n";
+              << " bodies to data/three_body_hierarchical_testparticle.h5\n";
 
     return 0;
 }
-
-
-
-
 
 
