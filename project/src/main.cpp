@@ -16,6 +16,7 @@
 #include "bodysystem.hpp"
 #include "data.hpp"
 #include "barnes_hut.hpp"
+#include "barnes_hut_cuda.cuh"
 
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
@@ -41,7 +42,7 @@ float dt = 0.0f;
 float lastFrame = 0.0f;
 
 float timeScale = 1.0f; // переменная для ускорения/замедления времени
-float fixedDt = 1.0f / 240.0f; // шаг времени;
+float fixedDt = 1.0f / 60; // шаг времени;
 float grid_size2  = 400.0f;
 int   vert_count2 = 10;
 
@@ -255,15 +256,16 @@ int main() {
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
     bool loaded = false;
-    char mode;
-    std::cout << "Выберите алгоритм: брутфорс или Барнс-Хат? [0/1]: " << std::flush;
+    int mode;
+    std::cout << "Выберите алгоритм: брутфорс, Барнс-Хат CPU или Барнс-Хат с GPU? [0/1/2]: " << std::flush;
     std::cin >> mode;
 
-    if (mode == '0') {
-        simulationStep = &simulationStepBrutForceCPU;
-    }
-    else{
-        simulationStep = &simulationStepBarnesHutCPU;
+    switch(mode) {
+        case 1:
+            simulationStep = &simulationStepBrutForceCPU;
+            break;
+        case 2:
+            simulationStep = &simulationStepBarnesHutCPU;
     }
 
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
