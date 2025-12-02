@@ -1,21 +1,25 @@
 #pragma once
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <glm/gtc/constants.hpp> 
 #include <vector>
 #include "object.hpp"
+
+typedef struct Mesh {
+    GLuint VAO = 0;
+    GLuint VBO = 0;
+    GLsizei vertexCount = 0;
+} Mesh; 
 
 class Renderer {
 public:
     // режим визуализации, выбираем его из main
     enum class Mode {
-        Sphere = 0,  // исходный вариант: рисуем треугольниками из VAO
         Points,      // одна точка на объект
         Cubes        // куб вместо объекта
     };
 
-    Renderer(int width, int height,
-             const char* vertexSrc,
-             const char* fragmentSrc);
+    Renderer(int width, int height);
     ~Renderer();
 
     void setProjection(float fov_deg, float aspect, float znear, float zfar);
@@ -31,11 +35,38 @@ private:
     GLuint program_ = 0;
     GLint  uModel_ = -1, uView_ = -1, uProj_ = -1, uColor_ = -1;
 
-    GLuint gridVAO_ = 0, gridVBO_ = 0;
-    size_t gridVertexCount_ = 0;
+    // Вершинный шейдер
+    const char* vs = R"glsl(
+        #version 330 core
+        layout(location=0) in vec3 aPos;
+        uniform mat4 model;
+        uniform mat4 view;
+        uniform mat4 projection;
+        void main() {
+            gl_Position = projection * view * model * vec4(aPos, 1.0);
+        }
+    )glsl";
+    
+    // Фрагментный шейдер
+    const char* fs = R"glsl(
+        #version 330 core
+        out vec4 FragColor;
+        uniform vec4 objectColor;
+        void main() {
+            FragColor = objectColor;
+        }
+    )glsl";
+
+    struct Mesh pointMesh_; 
+    struct Mesh sphereMesh_; 
+    struct Mesh cubeMesh_; 
+
+    void initMesh(Mesh& mesh, const std::vector<float>& vertices, int vertexComponents); // метод загрузки данных в OpenGL
+    void initCube(Mesh& cubeMesh_); // метод инициализации кастомного примитива "Куб"
+    void initPoint(Mesh& pointMesh_); // метод инициализации кастомного примитика "точка"
 
     // выбранный режим отрисовки
-    Mode mode_ = Mode::Sphere;
+    Mode mode_ = Mode::Points;
 
-    static GLuint compileProgram(const char* vs, const char* fs);
+    GLuint compileProgram();
 };

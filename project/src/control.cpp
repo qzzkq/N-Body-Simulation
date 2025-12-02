@@ -37,7 +37,6 @@ Control::Control(GLFWwindow* window,
 void Control::attach() {
     glfwSetWindowUserPointer(window_, this);
     glfwSetKeyCallback(window_, &Control::KeyCB);
-    glfwSetMouseButtonCallback(window_, &Control::MouseButtonCB);
     glfwSetScrollCallback(window_, &Control::ScrollCB);
     glfwSetCursorPosCallback(window_, &Control::CursorPosCB);
     glfwSetInputMode(window_, GLFW_CURSOR, GLFW_CURSOR_DISABLED);
@@ -47,10 +46,7 @@ void Control::attach() {
     auto* self = static_cast<Control*>(glfwGetWindowUserPointer(w));
     if (self) self->onKey(key, sc, action, mods);
 }
-/* static */ void Control::MouseButtonCB(GLFWwindow* w, int button, int action, int mods) {
-    auto* self = static_cast<Control*>(glfwGetWindowUserPointer(w));
-    if (self) self->onMouseButton(button, action, mods);
-}
+
 /* static */ void Control::ScrollCB(GLFWwindow* w, double xo, double yo) {
     auto* self = static_cast<Control*>(glfwGetWindowUserPointer(w));
     if (self) self->onScroll(xo, yo);
@@ -113,36 +109,6 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
         glViewport(0, 0, frW, frH); 
     }
 
-    // Движение создаваемого объекта стрелками
-    if (!objs_.empty() && objs_.back().Initalizing) {
-        if (key == GLFW_KEY_UP && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-            if (!shiftPressed) objs_.back().position.y += 0.5f;
-            objs_.back().position.z += 0.5f;
-        }
-        if (key == GLFW_KEY_DOWN && (action == GLFW_PRESS || action == GLFW_REPEAT)) {
-            if (!shiftPressed) objs_.back().position.y -= 0.5f;
-            objs_.back().position.z -= 0.5f;
-        }
-        if (key == GLFW_KEY_RIGHT && (action == GLFW_PRESS || action == GLFW_REPEAT))
-            objs_.back().position.x += 0.5f;
-        if (key == GLFW_KEY_LEFT  && (action == GLFW_PRESS || action == GLFW_REPEAT))
-            objs_.back().position.x -= 0.5f;
-    }
-}
-
-void Control::onMouseButton(int button, int action, int /*mods*/) {
-    if (button == GLFW_MOUSE_BUTTON_LEFT) {
-        if (action == GLFW_PRESS) {
-            objs_.emplace_back(glm::vec3(0.0f),
-                               glm::vec3(0.0f),
-                               initMass_, 1000.0f, std::nullopt);
-            objs_.back().Initalizing = true;
-        }
-        if (action == GLFW_RELEASE) {
-            objs_.back().Initalizing = false;
-            objs_.back().Launched = true;
-        }
-    }
 }
 
 void Control::onScroll(double /*xoffset*/, double yoffset) {

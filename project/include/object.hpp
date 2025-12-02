@@ -1,29 +1,12 @@
 #ifndef OBJECT_HPP
 #define OBJECT_HPP
 
-#include <GL/glew.h>
-#include <glm/glm.hpp>
 #include <optional>
+#include <glm/glm.hpp>
 #include <vector>
 
 class Object {
 public:
-    GLuint VAO, VBO;
-
-    glm::dvec3 position;
-    glm::dvec3 velocity;
-    glm::vec4 color;
-
-    size_t vertexCount;
-    
-    bool Initalizing;
-    bool Launched;
-    bool target;
-
-    double mass;
-    double density;
-    double radius;
-    glm::dvec3 LastPos;
 
     Object(glm::dvec3 initPosition, glm::dvec3 initVelocity,
            std::optional<double> mass = std::nullopt,
@@ -31,12 +14,34 @@ public:
            std::optional<double> radius = std::nullopt);
 
     void UpdatePos(double deltaTime);
-    void UpdateVertices();
-    glm::dvec3 GetPos() const;
     void accelerate(double x, double y, double z, double deltaTime);
 
+    // геттеры и сеттеры 
+    glm::dvec3 GetPos() const;
+    void SetPos(glm::dvec3 newPos); 
+
+    glm::dvec3 GetVel() const;
+    void SetVel(glm::dvec3 newVel); 
+
+    glm::vec4 GetColor() const;
+    void SetColor(glm::vec4 newColor); 
+
+    double GetMass() const;
+    void SetMass(double newMass); 
+
+    double GetDensity() const;
+    void SetDensity(double newDensity); 
+
+    double GetRadius() const;
+    void SetRadius(double newRadius); 
+
 private:
-    std::vector<float> Draw();
+    glm::dvec3 position;
+    glm::dvec3 velocity;
+    glm::vec4 color;
+    double mass;
+    double density;
+    double radius;
 };
 
 #endif // OBJECT_HPP

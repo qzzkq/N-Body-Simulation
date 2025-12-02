@@ -39,9 +39,9 @@ void BodySystem::calcParams(std::vector<Object>& objects) {
     }
     
     for (size_t i = 0; i < this->bodiesAmount; ++i) {
-        tMass += objects.at(i).mass; // вычисляем массу системы 
-        impulse += objects.at(i).mass * objects.at(i).velocity; // вычисляем импульс 
-        massMoment += objects.at(i).mass * objects.at(i).position; // сумма произведений массы на координаты 
+        tMass += objects.at(i).GetMass(); // вычисляем массу системы 
+        impulse += objects.at(i).GetMass() * objects.at(i).GetVel(); // вычисляем импульс 
+        massMoment += objects.at(i).GetMass() * objects.at(i).GetPos(); // сумма произведений массы на координаты 
 
     }
 
@@ -58,7 +58,7 @@ void BodySystem::calcParams(std::vector<Object>& objects) {
 void BodySystem::transPointToSystem(std::vector<Object>& objects) {
 
     for (size_t i = 0; i < this->bodiesAmount; ++i) {
-        objects.at(i).velocity -= this->systemVel; 
+        objects.at(i).GetVel() -= this->systemVel; 
     }
 
 }

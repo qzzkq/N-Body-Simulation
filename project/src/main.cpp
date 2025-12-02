@@ -51,27 +51,6 @@ char title[128];
 
 std::vector<Object> objs = {};
 
-// Шейдеры
-const char* vertexShaderSource = R"glsl(
-#version 330 core
-layout(location=0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-}
-)glsl";
-
-const char* fragmentShaderSource = R"glsl(
-#version 330 core
-out vec4 FragColor;
-uniform vec4 objectColor;
-void main() {
-    FragColor = objectColor;
-}
-)glsl";
-
 static inline float RadiusKm(double m, double rho) {
     const double r_m = cbrt((3.0 * m) / (4.0 * 3.14159265358979323846 * rho));
     return static_cast<float>(r_m / 50000.0); // ← было /100000.0
@@ -83,8 +62,8 @@ void colorFromMass(std::vector<Object>& objs) {
 
     for (size_t i = 0; i < objs.size() ; i++){
         Object& obj = objs[i];
-        minMass = (minMass > obj.mass) ? obj.mass : minMass;
-        maxMass = (maxMass < obj.mass) ? obj.mass : maxMass;
+        minMass = (minMass > obj.GetMass()) ? obj.GetMass() : minMass;
+        maxMass = (maxMass < obj.GetMass()) ? obj.GetMass() : maxMass;
     }
 
     const glm::vec3 burgundy = glm::vec3(0.50f, 0.00f, 0.125f);
@@ -92,18 +71,18 @@ void colorFromMass(std::vector<Object>& objs) {
 
     double denom = std::log10(std::max(1e-30, minMass)) - std::log10(std::max(1e-30, maxMass));
     if (!std::isfinite(denom) || std::abs(denom) < 1e-12) {
-        for (auto& o : objs) o.color = glm::vec4(glm::mix(burgundy, white, 0.5f), 1.0f);
+        for (auto& o : objs) o.SetColor(glm::vec4(glm::mix(burgundy, white, 0.5f), 1.0f));
         return;
     }
 
     for (size_t i = 0; i < objs.size(); i++){
         Object& obj = objs[i];
-        float m = glm::max(obj.mass, 1e-30);
+        float m = glm::max(obj.GetMass(), 1e-30);
         float t = (std::log10(m) - std::log10(minMass)) /
                 (std::log10(maxMass) - std::log10(minMass));
         t = glm::clamp(t, 0.0f, 1.0f);
         glm::vec3 rgb = glm::mix(burgundy, white, t);
-        obj.color = glm::vec4(rgb, 1.0f);
+        obj.SetColor(glm::vec4(rgb, 1.0f));
     }
 }
 
@@ -112,15 +91,12 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 {
     out.clear();
     out.reserve(static_cast<size_t>(N) + 1);
-
     Object center(glm::vec3(0), glm::vec3(0), centralMass, 141000.0f, std::nullopt);
-
-    center.Initalizing = false;
-    center.radius = RadiusKm(center.mass, center.density);
-    center.UpdateVertices();
+    center.SetRadius(RadiusKm(center.GetMass(), center.GetDensity()));
     out.push_back(center);
 
-    if (N <= 0) return;
+    if (N <= 0) 
+        return;
 
     std::mt19937 rng(seed);
     std::uniform_real_distribution<float> u01(0.0f, 1.0f);
@@ -147,31 +123,22 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
         float  v_kmps     = static_cast<float>(v_circ_mps / 1000.0f) * VEL_SCALE;
 
         Object o(pos, tdir * v_kmps, satMassBase, 1410.0f, std::nullopt);
-        o.Initalizing = false;
-        o.radius = RadiusKm(o.mass, o.density);
-        o.UpdateVertices();
+        o.SetRadius(RadiusKm(o.GetMass(), o.GetDensity()));
 
         out.push_back(std::move(o));
     }
-
     colorFromMass(out);
-
 }
 
 
 void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause){
     for (size_t i = 0; i < objs.size(); ++i) {
         Object& obj = objs[i];
-        if (obj.Initalizing) {
-            obj.radius = std::pow((3.0 * obj.mass / obj.density) / (4.0 * 3.14159265359), 1.0/3.0) / 100000.0;
-            obj.UpdateVertices();
-        }
+
+        obj.SetRadius(std::pow((3.0 * obj.GetMass() / obj.GetDensity()) / (4.0 * 3.14159265359), 1.0/3.0) / 100000.0);
 
         for (size_t j = i + 1; j < objs.size(); ++j) {
             Object& obj2 = objs[j];
-            if (obj.Initalizing || obj2.Initalizing) {
-                continue;
-            }
 
             glm::dvec3 delta = obj2.GetPos() - obj.GetPos();
             double distance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
@@ -180,13 +147,13 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause)
             }
 
             glm::dvec3 dir = delta / distance;
-            double combinedRadius = obj.radius + obj2.radius;
+            double combinedRadius = obj.GetRadius() + obj2.GetRadius();
 
             double effectiveDistance = std::max(distance, combinedRadius);
             double dist_m = effectiveDistance * 1000.0;        // м
-            double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);              // Н
-            float acc1_kmps2 = static_cast<float>((F / obj.mass)  / 1000.0);        // км/с²
-            float acc2_kmps2 = static_cast<float>((F / obj2.mass) / 1000.0);        // км/с²
+            double F = (G * obj.GetMass() * obj2.GetMass()) / (dist_m * dist_m);              // Н
+            float acc1_kmps2 = static_cast<float>((F / obj.GetMass())  / 1000.0);        // км/с²
+            float acc2_kmps2 = static_cast<float>((F / obj2.GetMass()) / 1000.0);        // км/с²
             glm::vec3 accObj  = glm::vec3(dir * static_cast<double>(acc1_kmps2));
             glm::vec3 accObj2 = glm::vec3(-dir * static_cast<double>(acc2_kmps2));
 
@@ -197,29 +164,29 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause)
 
             if (distance < combinedRadius) {
                 glm::vec3 normal = glm::vec3(dir);
-                glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
+                glm::vec3 relativeVelocity = glm::vec3(obj.GetVel() - obj2.GetVel());
                 float relVelAlongNormal = glm::dot(relativeVelocity, normal);
 
                 if (relVelAlongNormal < 0.0f) {
                     double restitution = 0.8;
-                    double invMass1 = 1.0 / obj.mass;
-                    double invMass2 = 1.0 / obj2.mass;
+                    double invMass1 = 1.0 / obj.GetMass();
+                    double invMass2 = 1.0 / obj2.GetMass();
                     double impulseScalar = -(1.0 + restitution) * static_cast<double>(relVelAlongNormal) / (invMass1 + invMass2);
                     glm::dvec3 impulse = glm::dvec3(normal) * impulseScalar;
-                    obj.velocity += impulse * invMass1;
-                    obj2.velocity -= impulse * invMass2;
+                    obj.SetVel(obj.GetVel() + impulse * invMass1);
+                    obj2.SetVel(obj.GetVel() - impulse * invMass2);
                 }
 
                 double penetration = combinedRadius - distance;
                 if (penetration > 0.0) {
-                    double invMass1 = 1.0 / obj.mass;
-                    double invMass2 = 1.0 / obj2.mass;
+                    double invMass1 = 1.0 / obj.GetMass();
+                    double invMass2 = 1.0 / obj2.GetMass();
                     double invMassSum = invMass1 + invMass2;
                     if (invMassSum > 0.0) {
                         double correctionScale = penetration / invMassSum;
                         glm::dvec3 correction = glm::dvec3(normal) * correctionScale;
-                        obj.position -= correction * invMass1;
-                        obj2.position += correction * invMass2;
+                        obj.SetPos(obj.GetPos() - correction * invMass1);
+                        obj2.SetPos(obj2.GetPos() + correction * invMass2);
                     }
                 }
             }
@@ -248,7 +215,7 @@ int main() {
         return -1;
     }
 
-    Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
+    Renderer renderer(800, 600);
     renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
     using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause);
     Handler simulationStep = nullptr;
@@ -262,14 +229,14 @@ int main() {
     if (mode == '0') {
         simulationStep = &simulationStepBrutForceCPU;
     }
-    else{
+    else {
         simulationStep = &simulationStepBarnesHutCPU;
     }
 
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
-    if (mode == '0'){
+    if (mode == '0') {
         auto files = ListH5Files("data");
         if (files.empty()){
             std::cout << "В ./data нет .h5 файлов. Генерируем рандомно.\n";
@@ -347,11 +314,6 @@ int main() {
         glfwSetWindowTitle(window, title);
         glfwSwapBuffers(window);
         glfwPollEvents();
-    }
-
-    for (auto& obj : objs) {
-        glDeleteVertexArrays(1, &obj.VAO);
-        glDeleteBuffers(1, &obj.VBO);
     }
     glfwTerminate();
     return 0;

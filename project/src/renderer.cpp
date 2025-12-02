@@ -9,31 +9,33 @@ namespace {
     constexpr double kG = 6.6743e-11;
 }
 
-Renderer::Renderer(int /*w*/, int /*h*/, const char* vs, const char* fs) {
-    program_ = compileProgram(vs, fs);
+Renderer::Renderer(int /*w*/, int /*h*/) { // конструктор renderer'а 
+    this->program_ = compileProgram();
     glUseProgram(program_);
-    uModel_ = glGetUniformLocation(program_, "model");
-    uView_  = glGetUniformLocation(program_, "view");
-    uProj_  = glGetUniformLocation(program_, "projection");
-    uColor_ = glGetUniformLocation(program_, "objectColor");
+    this->uModel_ = glGetUniformLocation(program_, "model");
+    this->uView_  = glGetUniformLocation(program_, "view");
+    this->uProj_  = glGetUniformLocation(program_, "projection");
+    this->uColor_ = glGetUniformLocation(program_, "objectColor");
 
-    glGenVertexArrays(1, &gridVAO_);
-    glGenBuffers(1, &gridVBO_);
-    glBindVertexArray(gridVAO_);
-    glBindBuffer(GL_ARRAY_BUFFER, gridVBO_);
-    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
-    glEnableVertexAttribArray(0);
-    glBindVertexArray(0);
+    initCube(this->cubeMesh_); 
+    initPoint(this->pointMesh_);
 }
 
-Renderer::~Renderer() {
-    if (gridVBO_) glDeleteBuffers(1, &gridVBO_);
-    if (gridVAO_) glDeleteVertexArrays(1, &gridVAO_);
-    if (program_) glDeleteProgram(program_);
+Renderer::~Renderer() { // деструктор - удаление шейдерной программы
+    if (this->program_) 
+        glDeleteProgram(program_);
+
+    if (this->cubeMesh_.VAO) {
+        glDeleteVertexArrays(1, &cubeMesh_.VAO);
+        glDeleteBuffers(1, &cubeMesh_.VBO);
+    }
+    if (this->pointMesh_.VAO) {
+        glDeleteVertexArrays(1, &pointMesh_.VAO);
+        glDeleteBuffers(1, &pointMesh_.VBO);
+    }
 }
 
-void Renderer::setProjection(float fov_deg,
+void Renderer::setProjection(float fov_deg, // метод, устанавливающий параметры обзора камеры 
                              float aspect,
                              float znear,
                              float zfar)
@@ -43,7 +45,7 @@ void Renderer::setProjection(float fov_deg,
     glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(P));
 }
 
-void Renderer::updateView(const glm::vec3& pos,
+void Renderer::updateView(const glm::vec3& pos, // изменение обзора 
                           const glm::vec3& front,
                           const glm::vec3& up)
 {
@@ -52,90 +54,49 @@ void Renderer::updateView(const glm::vec3& pos,
     glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(V));
 }
 
-void Renderer::drawObjects(const std::vector<Object>& objs) const {
+void Renderer::drawObjects(const std::vector<Object>& objs) const { // функция отрисовки объекта 
     glUseProgram(program_);
 
-    switch (mode_) {
-    case Mode::Points: {
-        glPointSize(6.0f);
-        for (const auto& obj : objs) {
-            glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(obj.position));
-            glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-            glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
+    const Mesh* currentMesh = nullptr;
+    GLenum drawMode = GL_TRIANGLES;
 
-            glBindVertexArray(obj.VAO);
-            glDrawArrays(GL_POINTS, 0, 1);
-        }
-        break;
+    switch (this->mode_) {
+        case Mode::Points: 
+            currentMesh = &pointMesh_;
+            drawMode = GL_POINTS;
+            glEnable(GL_PROGRAM_POINT_SIZE); // Включаем возможность менять размер точки
+            glPointSize(6.0f); // Устанавливаем размер точки
+            break;
+        case Mode::Cubes: 
+        default: 
+            currentMesh = &cubeMesh_;
+            drawMode = GL_TRIANGLES;
+            break;
     }
 
-    case Mode::Cubes: {
-        // рисуем один юнит-куб и масштабируем под радиус
-        static GLuint cubeVAO = 0, cubeVBO = 0;
-        if (cubeVAO == 0) {
-            float cubeVerts[] = {
-                // back
-                -1.f,-1.f,-1.f,  1.f, 1.f,-1.f,  1.f,-1.f,-1.f,
-                -1.f,-1.f,-1.f, -1.f, 1.f,-1.f,  1.f, 1.f,-1.f,
-                // front
-                -1.f,-1.f, 1.f,  1.f,-1.f, 1.f,  1.f, 1.f, 1.f,
-                -1.f,-1.f, 1.f,  1.f, 1.f, 1.f, -1.f, 1.f, 1.f,
-                // left
-                -1.f,-1.f,-1.f, -1.f,-1.f, 1.f, -1.f, 1.f, 1.f,
-                -1.f,-1.f,-1.f, -1.f, 1.f, 1.f, -1.f, 1.f,-1.f,
-                // right
-                 1.f,-1.f,-1.f,  1.f, 1.f, 1.f,  1.f,-1.f, 1.f,
-                 1.f,-1.f,-1.f,  1.f, 1.f,-1.f,  1.f, 1.f, 1.f,
-                // bottom
-                -1.f,-1.f,-1.f,  1.f,-1.f, 1.f,  1.f,-1.f,-1.f,
-                -1.f,-1.f,-1.f, -1.f,-1.f, 1.f,  1.f,-1.f, 1.f,
-                // top
-                -1.f, 1.f,-1.f,  1.f, 1.f,-1.f,  1.f, 1.f, 1.f,
-                -1.f, 1.f,-1.f,  1.f, 1.f, 1.f, -1.f, 1.f, 1.f
-            };
-            glGenVertexArrays(1, &cubeVAO);
-            glGenBuffers(1, &cubeVBO);
-            glBindVertexArray(cubeVAO);
-            glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
-            glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
-            glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3*sizeof(float), (void*)0);
-            glEnableVertexAttribArray(0);
-            glBindVertexArray(0);
-        }
-
+    if (currentMesh && currentMesh->VAO) {
+        glBindVertexArray(currentMesh->VAO);
+        
         for (const auto& obj : objs) {
-            float halfSide = glm::max(static_cast<float>(obj.radius), 0.0001f);
-
+            float scale = static_cast<float>(obj.GetRadius());
+            float halfSide = glm::max(scale, 0.0001f); 
             glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(obj.position));
-            M = glm::scale(M, glm::vec3(halfSide));
+            M = glm::translate(M, glm::vec3(obj.GetPos()));
+            if (mode_ == Mode::Cubes) {
+                M = glm::scale(M, glm::vec3(halfSide));
+            }
             glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-            glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-
-            glBindVertexArray(cubeVAO);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glUniform4f(uColor_, obj.GetColor().r, obj.GetColor().g, obj.GetColor().b, obj.GetColor().a);
+            glDrawArrays(drawMode, 0, currentMesh->vertexCount);
         }
-        break;
-    }
-
-    case Mode::Sphere:
-    default: {
-        for (const auto& obj : objs) {
-            glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(obj.position));
-            glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-            glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-
-            glBindVertexArray(obj.VAO);
-            glDrawArrays(GL_TRIANGLES, 0, static_cast<GLint>(obj.vertexCount / 3));
+        glBindVertexArray(0); // Отвязываем VAO 
+        if (mode_ == Mode::Points) {
+            glDisable(GL_PROGRAM_POINT_SIZE);
         }
-        break;
-    }
     }
 }
 
-GLuint Renderer::compileProgram(const char* vs, const char* fs) {
+GLuint Renderer::compileProgram() { // компиляция шейдерной программы для GPU
     auto compile = [](GLenum type, const char* src){
         GLuint s = glCreateShader(type);
         glShaderSource(s, 1, &src, nullptr);
@@ -148,8 +109,8 @@ GLuint Renderer::compileProgram(const char* vs, const char* fs) {
         }
         return s;
     };
-    GLuint v = compile(GL_VERTEX_SHADER,   vs);
-    GLuint f = compile(GL_FRAGMENT_SHADER, fs);
+    GLuint v = compile(GL_VERTEX_SHADER,   this->vs); // компиляция вершинного шейдера
+    GLuint f = compile(GL_FRAGMENT_SHADER, this->fs); // компиляция фрагментного шейдера
     GLuint p = glCreateProgram();
     glAttachShader(p, v);
     glAttachShader(p, f);
@@ -157,4 +118,53 @@ GLuint Renderer::compileProgram(const char* vs, const char* fs) {
     glDeleteShader(v);
     glDeleteShader(f);
     return p;
+}
+
+void Renderer::initCube(Mesh& mesh) {
+    // Вектор вершин для куба 2x2x2 (от -1 до 1) - 36 вершин (12 треугольников)
+    std::vector<float> vertices = {
+        //   X      Y      Z
+        // back
+        -1.f,-1.f,-1.f, 1.f, 1.f,-1.f, 1.f,-1.f,-1.f,
+        -1.f,-1.f,-1.f, -1.f, 1.f,-1.f, 1.f, 1.f,-1.f,
+        // front
+        -1.f,-1.f, 1.f, 1.f,-1.f, 1.f, 1.f, 1.f, 1.f,
+        -1.f,-1.f, 1.f, 1.f, 1.f, 1.f, -1.f, 1.f, 1.f,
+        // left
+        -1.f,-1.f,-1.f, -1.f,-1.f, 1.f, -1.f, 1.f, 1.f,
+        -1.f,-1.f,-1.f, -1.f, 1.f, 1.f, -1.f, 1.f,-1.f,
+        // right
+         1.f,-1.f,-1.f, 1.f, 1.f, 1.f, 1.f,-1.f, 1.f,
+         1.f,-1.f,-1.f, 1.f, 1.f,-1.f, 1.f, 1.f, 1.f,
+        // bottom
+        -1.f,-1.f,-1.f, 1.f,-1.f, 1.f, 1.f,-1.f,-1.f,
+        -1.f,-1.f,-1.f, -1.f,-1.f, 1.f, 1.f,-1.f, 1.f,
+        // top
+        -1.f, 1.f,-1.f, 1.f, 1.f,-1.f, 1.f, 1.f, 1.f,
+        -1.f, 1.f,-1.f, 1.f, 1.f, 1.f, -1.f, 1.f, 1.f
+    };
+    initMesh(mesh, vertices, 3);
+}
+
+void Renderer::initPoint(Mesh& mesh) {
+    std::vector<float> vertices = { 0.0f, 0.0f, 0.0f };
+    initMesh(mesh, vertices, 3);
+}
+
+void Renderer::initMesh(Mesh& mesh, const std::vector<float>& vertices, int vertexComponents) { // функция, которая загружает данные для визуализации
+    if (vertices.empty()) 
+        return;
+    if (mesh.VAO) {
+        glDeleteVertexArrays(1, &(mesh.VAO));
+        glDeleteBuffers(1, &(mesh.VBO));
+    }
+    mesh.vertexCount = static_cast<GLsizei>(vertices.size() / vertexComponents); 
+    glGenVertexArrays(1, &mesh.VAO);
+    glGenBuffers(1, &mesh.VBO);
+    glBindVertexArray(mesh.VAO);
+    glBindBuffer(GL_ARRAY_BUFFER, mesh.VBO);
+    glBufferData(GL_ARRAY_BUFFER, vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    glVertexAttribPointer(0, vertexComponents, GL_FLOAT, GL_FALSE, vertexComponents * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(0);
+    glBindVertexArray(0); 
 }

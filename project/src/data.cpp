@@ -22,8 +22,8 @@ static CompType MakeFileType() {
 
     constexpr size_t D    = sizeof(double);
     constexpr size_t POS  = 0;          
-    constexpr size_t VEL  = POS + 3*D;  
-    constexpr size_t MASS = VEL + 3*D;  
+    constexpr size_t VEL  = POS + 3 * D;  
+    constexpr size_t MASS = VEL + 3 * D;  
     constexpr size_t RAD  = MASS + D;   
     constexpr size_t SIZE = RAD + D;    
 
@@ -111,17 +111,15 @@ bool LoadObjectsFromFile(const std::string& filePath,
     for (const auto& p : parts) {
         Object o(glm::dvec3(p.position), glm::dvec3(p.velocity),
                  p.mass, /*density*/ std::nullopt, /*radius*/ p.radius);
-        o.Initalizing = false;
-        if (!std::isfinite(o.radius) || o.radius <= 0.0) {
-            if (o.density > 0.0) {
+        if (!std::isfinite(o.GetRadius()) || o.GetRadius() <= 0.0) {
+            if (o.GetDensity() > 0.0) {
                 constexpr double pi = 3.14159265358979323846;
-                const double r_m = std::cbrt((3.0 * o.mass) / (4.0 * pi * o.density));
-                o.radius = static_cast<float>(r_m / 100000.0);
+                const double r_m = std::cbrt((3.0 * o.GetMass()) / (4.0 * pi * o.GetDensity()));
+                o.SetRadius(static_cast<float>(r_m / 100000.0));
             } else {
-                o.radius = 1.0f;
+                o.SetRadius(1.0f);
             }
         }
-        o.UpdateVertices();
         outObjs.push_back(std::move(o));
     }
     return true;

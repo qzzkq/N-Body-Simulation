@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "object.hpp"
 #include "barnes_hut.hpp"
+
 struct OctreeNode {
     double mass;
     double cx, cy, cz;
@@ -64,7 +65,7 @@ static void insertBody(OctreeNode* node, Object* body) {
 static void computeMass(OctreeNode* node) {
     if (!node->children[0]) {
         if (node->body) {
-            node->mass = node->body->mass;
+            node->mass = node->body->GetMass();
             auto p = node->body->GetPos();
             node->cx = p.x;
             node->cy = p.y;
