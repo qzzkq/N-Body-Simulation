@@ -52,6 +52,7 @@ set(CORE_SRC
     src/data.cpp
     src/bodysystem.cpp
     src/barnes_hut.cpp
+    src/windowHandler.cpp
 )
 
 add_library(Core ${CORE_SRC})

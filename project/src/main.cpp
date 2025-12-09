@@ -1,5 +1,3 @@
-#include <GL/glew.h>
-#include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -15,6 +13,7 @@
 #include "control.hpp"
 #include "bodysystem.hpp"
 #include "data.hpp"
+#include "windowHandler.hpp"
 #include "barnes_hut.hpp"
 
 #ifndef VEL_SCALE
@@ -53,7 +52,7 @@ std::vector<Object> objs = {};
 
 static inline float RadiusKm(double m, double rho) {
     const double r_m = cbrt((3.0 * m) / (4.0 * 3.14159265358979323846 * rho));
-    return static_cast<float>(r_m / 50000.0); // ← было /100000.0
+    return static_cast<float>(r_m / 50000.0); 
 }
 
 void colorFromMass(std::vector<Object>& objs) {
@@ -198,10 +197,6 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause)
     }
 }
 
-
-GLFWwindow* StartGLU();
-
-
 int main() {
 
 #ifdef _WIN32
@@ -209,15 +204,16 @@ int main() {
     SetConsoleCP(65001);
 #endif
 
-    GLFWwindow* window = StartGLU();
-    if (!window) {
+    WindowHandler wh = WindowHandler(); // создаём обработчик окна
+
+    if (!wh.createWindow()) { // пытаемся создать окно
         std::cerr << "Window or OpenGL context creation failed.\n";
         return -1;
     }
 
     Renderer renderer(800, 600);
     renderer.setProjection(65.0f, 800.0f/600.0f, 8.3f, 100000.0f);
-    using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause);
+    using Handler = void(*) (std::vector<Object>& objs, float dt, bool pause);
     Handler simulationStep = nullptr;
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
@@ -272,17 +268,17 @@ int main() {
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
     // Управление
-    Control control(window, objs,
+    Control control(wh.getWindowPointer(), objs,
                     cameraPos, cameraFront, cameraUp,
                     dt, timeScale, pause, running,
                     yaw, pitch, lastX, lastY,
                     initMass);
     control.attach();
 
-    double lastTime = glfwGetTime();
+    double lastTime = wh.getTime();
     double accumulator = 0.0;
-    while (!glfwWindowShouldClose(window) && running) {
-        double now = glfwGetTime();
+    while (!wh.closeFlag() && running) {
+        double now = wh.getTime();
         double frameRealDt = now - lastTime;
         dt = frameRealDt;
         lastTime = now;
@@ -302,7 +298,7 @@ int main() {
         }
 
         // Отрисовка
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+        wh.cleanWindow();
         renderer.updateView(cameraPos, cameraFront, cameraUp);
         renderer.drawObjects(objs);
 
@@ -311,39 +307,9 @@ int main() {
         std::snprintf(title, sizeof(title),
               "3D_TEST | timeScale: %.2fx | FPS: %.0f | Objects =: %zu",
               timeScale, fps, objs.size());
-        glfwSetWindowTitle(window, title);
-        glfwSwapBuffers(window);
-        glfwPollEvents();
+        wh.setTitle(title);
+        wh.show(); 
     }
-    glfwTerminate();
+    wh.cleanResources();
     return 0;
-}
-
-// Инициализируем контекст openGL
-GLFWwindow* StartGLU() {
-    if (!glfwInit()) {
-        std::cout << "Failed to initialize GLFW\n";
-        return nullptr;
-    }
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "3D_TEST", nullptr, nullptr);
-    if (!window) {
-        std::cerr << "Failed to create GLFW window.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-    glfwMakeContextCurrent(window);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, 800, 600);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    return window;
 }
