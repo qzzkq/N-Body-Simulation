@@ -16,7 +16,10 @@
 #include "bodysystem.hpp"
 #include "data.hpp"
 #include "barnes_hut.hpp"
+#include "H5Cpp.h"
+#ifdef USE_CUDA
 #include "barnes_hut_cuda.cuh"
+#endif
 
 #ifndef VEL_SCALE
 #define VEL_SCALE 1.0f
@@ -41,6 +44,7 @@ float pitch = 0.0f;
 float dt = 0.0f;
 float lastFrame = 0.0f;
 
+double gSimTime = 0.0;
 float timeScale = 1.0f; // переменная для ускорения/замедления времени
 float fixedDt = 1.0f / 60; // шаг времени;
 float grid_size2  = 400.0f;
@@ -257,7 +261,19 @@ int main() {
 
     bool loaded = false;
     int mode;
-    std::cout << "Выберите алгоритм: брутфорс, Барнс-Хат CPU или Барнс-Хат с GPU? [0/1/2]: " << std::flush;
+
+#ifdef USE_CUDA
+    std::cout << "Выберите алгоритм:\n"
+              << "  [1] Брутфорс (O(N^2))\n"
+              << "  [2] Барнс-Хат CPU\n"
+              << "  [3] Барнс-Хат GPU (CUDA)\n"
+              << "Введите номер: " << std::flush;
+#else
+    std::cout << "Выберите алгоритм:\n"
+              << "  [1] Брутфорс (O(N^2))\n"
+              << "  [2] Барнс-Хат CPU\n"
+              << "Введите номер: " << std::flush;
+#endif
     std::cin >> mode;
 
     switch(mode) {
@@ -267,15 +283,18 @@ int main() {
         case 2:
             simulationStep = &simulationStepBarnesHutCPU;
             break;
+#ifdef USE_CUDA
         case 3:
             simulationStep = &simulationStepBarnesHutCUDA;
             break;
+#endif
         default:
             std::cout << "Неверный выбор, используем брутфорс.\n";
             simulationStep = &simulationStepBrutForceCPU;
             break;
     }
 
+    // -------- выбор сценария (файл / рандом) --------
     std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
     std::cin >> mode;
 
@@ -308,6 +327,10 @@ int main() {
         spawnSystem(objs, numObjs, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/70000.0f, /*seed*/42);
     }
 
+    H5::H5File framesFile = OpenFramesFile("data/frames.h5", objs.size());
+    std::size_t frameIndex = 0;
+    WriteFrame(framesFile, objs, gSimTime, frameIndex);
+    ++frameIndex;
     // Чтение с HDF5
 
     BodySystem bodySystem(objs); // создание сохрянем информацию о системе
@@ -336,14 +359,24 @@ int main() {
         const int MAX_SUBSTEPS = 8;
         while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS) {
             simulationStep(objs, fixedDt, pause);
+            if (!pause) {
+                gSimTime += fixedDt;
+            }
             accumulator -= fixedDt;
             ++substeps;
         }
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
+            if (!pause) {
+                gSimTime += fixedDt;
+            }
             accumulator -= fixedDt;
         }
 
+        if (!pause) {
+            WriteFrame(framesFile, objs, gSimTime, frameIndex);
+            ++frameIndex;
+        }
         // Отрисовка
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderer.updateView(cameraPos, cameraFront, cameraUp);
@@ -363,6 +396,7 @@ int main() {
         glDeleteVertexArrays(1, &obj.VAO);
         glDeleteBuffers(1, &obj.VBO);
     }
+    FinalizeFramesFile(framesFile, frameIndex);
     glfwTerminate();
     return 0;
 }
