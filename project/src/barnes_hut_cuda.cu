@@ -7,9 +7,12 @@
 #include "object.hpp"
 
 #define THREADS_PER_BLOCK 256
-#define MAX_STACK 64
+#define MAX_STACK 256
 #define THETA 0.5
 #define G_CONST 6.6743e-20
+
+
+#define SOFTENING_SQ 0.1 
 
 struct __align__(16) GpuNode {
     double3 center;
@@ -57,7 +60,8 @@ __global__ void computeForcesKernel(
         double dx = n.center.x - myPos.x;
         double dy = n.center.y - myPos.y;
         double dz = n.center.z - myPos.z;
-        double distSq = dx*dx + dy*dy + dz*dz + 1e-20;
+        
+        double distSq = dx*dx + dy*dy + dz*dz + SOFTENING_SQ; 
         double dist = sqrt(distSq);
 
         bool isLeaf = (n.bodyIdx != -1);
@@ -138,7 +142,19 @@ static int getOctant(double tx, double ty, double tz, double size, double px, do
 static void insertBody(int nodeIdx, int bodyIdx, const glm::dvec3& pos, double mass) {
     BuildNode* node = &buildPool[nodeIdx];
 
-    if (node->mass == 0.0 && node->bodyIdx == -1 && node->children[0] == -1) {
+    if (node->size < 1e-9) { 
+        return;
+    }
+
+    bool hasChildren = false;
+    for(int i = 0; i < 8; ++i) {
+        if(node->children[i] != -1) {
+            hasChildren = true;
+            break;
+        }
+    }
+
+    if (node->mass == 0.0 && node->bodyIdx == -1 && !hasChildren) {
         node->bodyIdx = bodyIdx;
         node->mass = mass;
         node->cx = pos.x; node->cy = pos.y; node->cz = pos.z;
@@ -147,32 +163,42 @@ static void insertBody(int nodeIdx, int bodyIdx, const glm::dvec3& pos, double m
 
     if (node->bodyIdx != -1) {
         int oldBody = node->bodyIdx;
-        node->bodyIdx = -1;
+        node->bodyIdx = -1; 
         
         int oct = getOctant(node->x, node->y, node->z, node->size, node->cx, node->cy, node->cz);
+        
         if (node->children[oct] == -1) {
             double qs = node->size * 0.25;
             double nx = node->x + ((oct&1) ? qs : -qs);
             double ny = node->y + ((oct&2) ? qs : -qs);
             double nz = node->z + ((oct&4) ? qs : -qs);
-            node->children[oct] = newBuildNode(nx, ny, nz, node->size * 0.5);
-            node = &buildPool[nodeIdx];
+            
+            int childIdx = newBuildNode(nx, ny, nz, node->size * 0.5);
+            node = &buildPool[nodeIdx]; 
+            node->children[oct] = childIdx;
         }
+
         insertBody(node->children[oct], oldBody, glm::dvec3(node->cx, node->cy, node->cz), node->mass);
         
+        node = &buildPool[nodeIdx]; 
+
         node->mass = 0;
         node->cx = 0; node->cy = 0; node->cz = 0;
     }
 
     int oct = getOctant(node->x, node->y, node->z, node->size, pos.x, pos.y, pos.z);
+    
     if (node->children[oct] == -1) {
         double qs = node->size * 0.25;
         double nx = node->x + ((oct&1) ? qs : -qs);
         double ny = node->y + ((oct&2) ? qs : -qs);
         double nz = node->z + ((oct&4) ? qs : -qs);
-        node->children[oct] = newBuildNode(nx, ny, nz, node->size * 0.5);
-        node = &buildPool[nodeIdx];
+        
+        int childIdx = newBuildNode(nx, ny, nz, node->size * 0.5);
+        node = &buildPool[nodeIdx]; 
+        node->children[oct] = childIdx;
     }
+    
     insertBody(node->children[oct], bodyIdx, pos, mass);
 }
 
@@ -268,6 +294,8 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause
 
     nodesUsed = 0;
     double maxSpan = std::max({maxX - minX, maxY - minY, maxZ - minZ});
+    maxSpan *= 1.01; 
+    
     double cx = (minX + maxX) * 0.5;
     double cy = (minY + maxY) * 0.5;
     double cz = (minZ + maxZ) * 0.5;

@@ -46,7 +46,7 @@ float lastFrame = 0.0f;
 
 double gSimTime = 0.0;
 float timeScale = 1.0f; // переменная для ускорения/замедления времени
-float fixedDt = 1.0f / 60; // шаг времени;
+float fixedDt = 1.0f / 10; // шаг времени;
 float grid_size2  = 400.0f;
 int   vert_count2 = 10;
 
@@ -277,8 +277,27 @@ int main() {
     Handler simulationStep = nullptr;
     cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
+    RenderMode renderMode = RenderMode::Sphere;
+
     bool loaded = false;
     int mode;
+    std::cout << "Кубы/шары/точка [0/1/2]\n";
+    std::cin >> mode;
+    switch (mode){
+        case 0:
+            renderMode = RenderMode::Cubes;
+            break;
+        case 1:
+            renderMode = RenderMode::Sphere;
+            break;
+        case 2:
+            renderMode = RenderMode::Points;
+            break;
+        default:
+            renderMode = RenderMode::Sphere;
+            break;
+    }
+    renderer.setRenderMode(renderMode);
 
 #ifdef USE_CUDA
     std::cout << "Выберите алгоритм:\n"
@@ -342,7 +361,7 @@ int main() {
         int numObjs;
         std::cout << "Сколько тел загружаем?: " << std::flush;
         std::cin >> numObjs;
-        spawnSystem(objs, numObjs, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/70000.0f, /*seed*/42);
+        spawnSystem(objs, numObjs, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/7000.0f, /*seed*/42);
     }
 
     H5::H5File framesFile = OpenFramesFile("data/frames.h5", objs.size());
@@ -377,24 +396,19 @@ int main() {
         const int MAX_SUBSTEPS = 8;
         while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS) {
             simulationStep(objs, fixedDt, pause);
-            if (!pause) {
-                gSimTime += fixedDt;
-            }
+            gSimTime += fixedDt;
             accumulator -= fixedDt;
             ++substeps;
         }
         while (accumulator >= fixedDt) {
             simulationStep(objs, fixedDt, pause);
-            if (!pause) {
-                gSimTime += fixedDt;
-            }
+            gSimTime += fixedDt;
             accumulator -= fixedDt;
         }
 
-        if (!pause) {
-            WriteFrame(framesFile, objs, gSimTime, frameIndex);
-            ++frameIndex;
-        }
+        WriteFrame(framesFile, objs, gSimTime, frameIndex);
+        ++frameIndex;
+
         // Отрисовка
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         renderer.updateView(cameraPos, cameraFront, cameraUp);
