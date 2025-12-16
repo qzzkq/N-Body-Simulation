@@ -1,35 +1,14 @@
 cmake_minimum_required(VERSION 3.21)
-project(NBodySimulation LANGUAGES CXX VERSION 1.0)
+project(NBodySimulation LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# ---------------------------------------------------------
-# Выходные директории
-# ---------------------------------------------------------
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin)
-set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
-set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/lib)
+# Для стандартных путей установки (bin, lib, etc.)
+include(GNUInstallDirs)
 
 # ---------------------------------------------------------
-# RPATH (Linux и MinGW)
-# ---------------------------------------------------------
-# включаем использование относительных rpath
-set(CMAKE_BUILD_RPATH_USE_ORIGIN ON)
-
-# Для Linux — lib лежит на уровень выше bin
-if(UNIX AND NOT WIN32)
-    set(CMAKE_INSTALL_RPATH "$ORIGIN/../lib")
-    set(CMAKE_BUILD_RPATH   "$ORIGIN/../lib")
-endif()
-
-# Для MSYS2 / MinGW64 — rpath не используется, DLL ищутся автоматически через PATH
-if(MINGW)
-    # Ничего не делаем — MSYS2 сам подхватывает DLL из /mingw64/bin
-endif()
-
-# ---------------------------------------------------------
-# Dependencies
+# 1. Поиск зависимостей
 # ---------------------------------------------------------
 find_package(OpenGL REQUIRED)
 find_package(GLEW   REQUIRED)
@@ -37,13 +16,33 @@ find_package(glfw3  REQUIRED)
 find_package(glm    REQUIRED)
 find_package(HDF5   REQUIRED COMPONENTS C CXX HL)
 
-# Linux system libs
-if(UNIX AND NOT WIN32)
-    set(SYSTEM_LIBS X11 Xrandr Xi Xxf86vm Xcursor pthread)
+# ---------------------------------------------------------
+# 2. Определение CUDA (Автоматически)
+# ---------------------------------------------------------
+include(CheckLanguage)
+check_language(CUDA)
+
+if(CMAKE_CUDA_COMPILER)
+    enable_language(CUDA)
+    find_package(CUDAToolkit REQUIRED)
+    message(STATUS "CUDA found! GPU acceleration enabled.")
+    
+    add_compile_definitions(USE_CUDA)
+    set(CUDA_SOURCES src/barnes_hut_cuda.cu)
+else()
+    message(STATUS "CUDA NOT found. Building CPU-only version.")
+    set(CUDA_SOURCES "")
 endif()
 
 # ---------------------------------------------------------
-# Core library
+# 3. Настройка системных библиотек (Linux)
+# ---------------------------------------------------------
+if(UNIX AND NOT WIN32)
+    set(SYSTEM_LIBS X11 Xrandr Xi Xxf86vm Xcursor pthread dl)
+endif()
+
+# ---------------------------------------------------------
+# 4. Сборка ядра (Core Library)
 # ---------------------------------------------------------
 set(CORE_SRC
     src/object.cpp
@@ -52,12 +51,13 @@ set(CORE_SRC
     src/data.cpp
     src/bodysystem.cpp
     src/barnes_hut.cpp
-)
+    ${CUDA_SOURCES}) 
 
-add_library(Core ${CORE_SRC})
+add_library(Core STATIC ${CORE_SRC})
 
 target_include_directories(Core PUBLIC
     include
+    src
     ${HDF5_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
     ${glm_INCLUDE_DIRS}
@@ -71,28 +71,43 @@ target_link_libraries(Core PUBLIC
     GLEW::GLEW
     glfw
     ${SYSTEM_LIBS}
+) 
+
+if(CMAKE_CUDA_COMPILER)
+    target_link_libraries(Core PUBLIC CUDA::cudart)
+    set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES native)
+endif()
+
+# ---------------------------------------------------------
+# 5. Исполняемые файлы
+# ---------------------------------------------------------
+
+# Симуляция
+add_executable(Simulate src/main.cpp)
+target_link_libraries(Simulate PRIVATE Core)
+
+# Проигрыватель
+add_executable(Replay src/replay.cpp)
+target_link_libraries(Replay PRIVATE Core)
+
+# Генератор данных
+add_executable(DataCreator src/datacreator.cpp)
+target_link_libraries(DataCreator PRIVATE Core)
+
+# ---------------------------------------------------------
+# 6. Установка (INSTALL)
+# ---------------------------------------------------------
+
+# 1. Установка бинарных файлов и библиотеки
+install(TARGETS Simulate Replay DataCreator Core
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} 
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
 )
 
-# ---------------------------------------------------------
-# Executables
-# ---------------------------------------------------------
-add_executable(Simulate     src/main.cpp)
-add_executable(DataCreator  src/datacreator.cpp)
-
-foreach(tgt Simulate DataCreator)
-    target_link_libraries(${tgt} PRIVATE Core)
-endforeach()
-
-# ---------------------------------------------------------
-# Install rules
-# ---------------------------------------------------------
-install(TARGETS Simulate DataCreator Core
-    RUNTIME DESTINATION bin
-    LIBRARY DESTINATION lib
-    ARCHIVE DESTINATION lib
-)
-
-install(DIRECTORY include/ DESTINATION include)
-
-install(DIRECTORY data/ DESTINATION bin/data)
-
+# 2. Установка папки data
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
+    install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR}) 
+else()
+    message(WARNING "Folder 'data' not found in source directory! It won't be installed.")
+endif() 

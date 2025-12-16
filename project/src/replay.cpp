@@ -15,6 +15,10 @@
 #include <algorithm>
 #include <limits>
 
+#ifdef _WIN32
+#include <windows.h>
+#endif
+
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
@@ -58,13 +62,28 @@ void main() {
 }
 )glsl";
 
+// Инициализируем контекст openGL
 GLFWwindow* StartGLU() {
+
     if (!glfwInit()) {
         std::cout << "Failed to initialize GLFW\n";
         return nullptr;
     }
-    glfwInitHint(GLFW_PLATFORM, GLFW_PLATFORM_X11);
-    GLFWwindow* window = glfwCreateWindow(800, 600, "Replay", nullptr, nullptr);
+
+    // получаем параметры монитора 
+    GLFWmonitor* monitor = glfwGetPrimaryMonitor(); 
+    if (monitor == NULL) {
+        std::cerr << "Failed to create GLFW window";
+        return nullptr; 
+    }
+
+    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
+    if (mode == NULL) {
+        std::cerr << "Failed to create GLFW window";
+        return nullptr; 
+    }
+
+    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "3D_TEST", nullptr, nullptr);
     if (!window) {
         std::cerr << "Failed to create GLFW window.\n";
         glfwTerminate();
@@ -80,7 +99,7 @@ GLFWwindow* StartGLU() {
     }
 
     glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, 800, 600);
+    glViewport(0, 0, mode->width, mode->height);
     glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     return window;
@@ -106,33 +125,50 @@ static H5::CompType MakeFrame0TypeReplay()
 }
 
 void colorFromMass(std::vector<Object>& objs) {
+    if (objs.empty()) return;
+
     double minMass = std::numeric_limits<double>::max();
     double maxMass = -1.0;
 
-    for (auto& obj : objs) {
-        minMass = std::min(minMass, obj.mass);
-        maxMass = std::max(maxMass, obj.mass);
+    // определение минимальной массы 
+    for (const auto& obj : objs) {
+        if (obj.mass > maxMass) maxMass = obj.mass;
+        if (obj.mass < minMass) minMass = obj.mass;
     }
 
-    const glm::vec3 burgundy(0.50f, 0.00f, 0.125f);
-    const glm::vec3 white   (1.00f, 1.00f, 1.00f);
+    // Защита от нулевой массы и log(0)
+    minMass = std::max(minMass, 1e-30);
+    maxMass = std::max(maxMass, 1e-30);
 
-    double denom = std::log10(std::max(1e-30, minMass)) -
-                   std::log10(std::max(1e-30, maxMass));
-    if (!std::isfinite(denom) || std::abs(denom) < 1e-12) {
-        for (auto& o : objs) {
-            o.color = glm::vec4(glm::mix(burgundy, white, 0.5f), 1.0f);
-        }
-        return;
-    }
+    // 2. Палитра цветов для планет 
+    const glm::vec3 colorCold = glm::vec3(0.8f, 0.4f, 0.0f); // Темно-оранжевый (лёгкие)
+    const glm::vec3 colorMid  = glm::vec3(1.0f, 0.9f, 0.1f); // Ярко-желтый (средние и тяжелее среднего)
+    const glm::vec3 colorHot  = glm::vec3(1.0f, 1.0f, 1.0f); // Белый (самые тяжёлые)
 
+    // Используем логарифмическую шкалу, так как массы планет отличаются в миллиарды раз
+    double logMin = std::log10(minMass);
+    double logMax = std::log10(maxMass);
+    double range = logMax - logMin;
+
+    // присваиваем цвета объектам
     for (auto& obj : objs) {
         double m = std::max(obj.mass, 1e-30);
-        double t = (std::log10(m) - std::log10(minMass)) /
-                   (std::log10(maxMass) - std::log10(minMass));
-        t = std::clamp(t, 0.0, 1.0);
-        glm::vec3 rgb = glm::mix(burgundy, white, static_cast<float>(t));
-        obj.color = glm::vec4(rgb, 1.0f);
+        double val = std::log10(m);
+        float t = 0.0f;
+        if (range > 1e-9) {
+            t = static_cast<float>((val - logMin) / range);
+        }
+        t = std::clamp(t, 0.0f, 1.0f);
+        glm::vec3 finalColor;
+        if (t < 0.6f) {
+            float localT = t / 0.6f; 
+            finalColor = glm::mix(colorCold, colorMid, localT);
+        } 
+        else {
+            float localT = (t - 0.6f) / 0.4f;
+            finalColor = glm::mix(colorMid, colorHot, localT);
+        }
+        obj.color = glm::vec4(finalColor, 1.0f);
     }
 }
 
@@ -206,8 +242,11 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    Renderer renderer(800, 600, vertexShaderSource, fragmentShaderSource);
-    renderer.setProjection(65.0f, 800.0f / 600.0f, 8.3f, 100000.0f);
+    int width, height;
+    glfwGetFramebufferSize(window, &width, &height);
+
+    Renderer renderer(width, height, vertexShaderSource, fragmentShaderSource);
+    renderer.setProjection(65.0f, (float) width/ (float) height, 8.3f, 100000.0f);
 
     cameraPos   = glm::vec3(0.0f, 50.0f, 250.0f);
     cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
