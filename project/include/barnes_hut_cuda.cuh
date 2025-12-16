@@ -6,4 +6,4 @@ void InitBarnesHutCUDA(size_t maxObjects);
 
 void CleanupBarnesHutCUDA();
 
-void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause);
+void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause, int iterations);

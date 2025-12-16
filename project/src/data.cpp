@@ -168,136 +168,115 @@ bool LoadObjectsFromFile(const std::string& filePath,
 }
 
 
-// frame_000000: position + mass + radius
-// frame_000001+: только position
-
-struct Frame0Record {
+struct InitRecord {
     glm::dvec3 position;
     double     mass;
     double     radius;
 };
 
-static CompType MakeFrame0Type()
-{
+static CompType GetInitType() {
     hsize_t v3dims[1] = {3};
     ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
-
-    CompType t(sizeof(Frame0Record));
-    t.insertMember("position", HOFFSET(Frame0Record, position), vec3Type);
-    t.insertMember("mass",     HOFFSET(Frame0Record, mass),     PredType::NATIVE_DOUBLE);
-    t.insertMember("radius",   HOFFSET(Frame0Record, radius),   PredType::NATIVE_DOUBLE);
+    CompType t(sizeof(InitRecord));
+    t.insertMember("position", HOFFSET(InitRecord, position), vec3Type);
+    t.insertMember("mass",     HOFFSET(InitRecord, mass),     PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   HOFFSET(InitRecord, radius),   PredType::NATIVE_DOUBLE);
     return t;
 }
 
-static CompType& GetFrame0Type()
-{
-    static CompType t = MakeFrame0Type();
-    return t;
+static ArrayType GetPosType() {
+    hsize_t v3dims[1] = {3};
+    return ArrayType(PredType::NATIVE_DOUBLE, 1, v3dims);
 }
 
-H5::H5File OpenFramesFile(const std::string& fileName,
-                          std::size_t numBodies)
+H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodies, double dt)
 {
-    H5::H5File file(fileName, H5F_ACC_TRUNC);
+    H5File file(fileName, H5F_ACC_TRUNC);
 
-    hsize_t dims[1] = {1};
-    H5::DataSpace scalar(1, dims);
+    hsize_t scalarDims[1] = {1};
+    DataSpace scalarSpace(1, scalarDims);
+
+    hsize_t nb = static_cast<hsize_t>(numBodies);
+    Attribute attNb = file.createAttribute("num_bodies", PredType::NATIVE_HSIZE, scalarSpace);
+    attNb.write(PredType::NATIVE_HSIZE, &nb);
+
+    Attribute attDt = file.createAttribute("dt", PredType::NATIVE_DOUBLE, scalarSpace);
+    attDt.write(PredType::NATIVE_DOUBLE, &dt);
+
+    hsize_t nf = 0;
+    Attribute attNf = file.createAttribute("num_frames", PredType::NATIVE_HSIZE, scalarSpace);
+    attNf.write(PredType::NATIVE_HSIZE, &nf);
 
     {
-        hsize_t nb = static_cast<hsize_t>(numBodies);
-        H5::Attribute aNb = file.createAttribute(
-            "num_bodies",
-            H5::PredType::NATIVE_HSIZE,
-            scalar
-        );
-        aNb.write(H5::PredType::NATIVE_HSIZE, &nb);
+        hsize_t initDims[1] = {nb};
+        DataSpace initSpace(1, initDims);
+        file.createDataSet("initial_data", GetInitType(), initSpace);
     }
 
     {
-        hsize_t nf = 0;
-        H5::Attribute aNf = file.createAttribute(
-            "num_frames",
-            H5::PredType::NATIVE_HSIZE,
-            scalar
-        );
-        aNf.write(H5::PredType::NATIVE_HSIZE, &nf);
+        hsize_t dims[2]    = {0, nb};
+        hsize_t maxDims[2] = {H5S_UNLIMITED, nb};
+        DataSpace tracksSpace(2, dims, maxDims);
+
+        DSetCreatPropList prop;
+        hsize_t chunkDims[2] = {1, nb}; 
+        prop.setChunk(2, chunkDims);
+        prop.setDeflate(4);
+
+        file.createDataSet("tracks", GetPosType(), tracksSpace, prop);
     }
 
     file.flush(H5F_SCOPE_GLOBAL);
     return file;
 }
 
-void WriteFrame(H5::H5File& file,
-                const std::vector<Object>& objs,
-                double t,
-                std::size_t frameIndex,
-                const std::string& prefix)
+void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std::size_t frameIndex)
 {
     if (objs.empty()) return;
-
-    char name[64];
-    std::snprintf(name, sizeof(name), "%s_%06zu",
-                  prefix.c_str(), static_cast<std::size_t>(frameIndex));
-
-    hsize_t dims[1] = { static_cast<hsize_t>(objs.size()) };
-    H5::DataSpace space(1, dims);
+    hsize_t numBodies = static_cast<hsize_t>(objs.size());
 
     if (frameIndex == 0) {
-        std::vector<Frame0Record> recs;
-        recs.reserve(objs.size());
-        for (const auto& o : objs) {
-            Frame0Record r;
-            r.position = o.position;
-            r.mass     = o.mass;
-            r.radius   = o.radius;
-            recs.push_back(r);
+        DataSet dset = file.openDataSet("initial_data");
+        std::vector<InitRecord> buffer(objs.size());
+        for (size_t i = 0; i < objs.size(); ++i) {
+            buffer[i].position = objs[i].position;
+            buffer[i].mass     = objs[i].mass;
+            buffer[i].radius   = objs[i].radius;
         }
-
-        H5::CompType& type = GetFrame0Type();
-        H5::DataSet dset = file.createDataSet(name, type, space);
-        dset.write(recs.data(), type);
-
-        H5::DataSpace scalar(H5S_SCALAR);
-        H5::Attribute tAttr = dset.createAttribute(
-            "time",
-            H5::PredType::NATIVE_DOUBLE,
-            scalar
-        );
-        tAttr.write(H5::PredType::NATIVE_DOUBLE, &t);
-    } else {
-        std::vector<glm::dvec3> pos;
-        pos.reserve(objs.size());
-        for (const auto& o : objs) {
-            pos.push_back(o.position);
-        }
-
-        hsize_t v3dims[1] = {3};
-        H5::ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
-
-        H5::DataSet dset = file.createDataSet(name, vec3Type, space);
-        dset.write(pos.data(), vec3Type);
-
-        H5::DataSpace scalar(H5S_SCALAR);
-        H5::Attribute tAttr = dset.createAttribute(
-            "time",
-            H5::PredType::NATIVE_DOUBLE,
-            scalar
-        );
-        tAttr.write(H5::PredType::NATIVE_DOUBLE, &t);
+        dset.write(buffer.data(), GetInitType());
     }
 
-    file.flush(H5F_SCOPE_GLOBAL);
+    DataSet dset = file.openDataSet("tracks");
+    
+    hsize_t currentDims[2] = { static_cast<hsize_t>(frameIndex) + 1, numBodies };
+    dset.extend(currentDims);
+
+    DataSpace fileSpace = dset.getSpace();
+    hsize_t offset[2] = { static_cast<hsize_t>(frameIndex), 0 };
+    hsize_t count[2]  = { 1, numBodies };
+    fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+
+    std::vector<glm::dvec3> positions(objs.size());
+    for (size_t i = 0; i < objs.size(); ++i) {
+        positions[i] = objs[i].position;
+    }
+
+    hsize_t memDims[2] = { 1, numBodies };
+    DataSpace memSpace(2, memDims);
+
+    dset.write(positions.data(), GetPosType(), memSpace, fileSpace);
 }
 
-void FinalizeFramesFile(H5::H5File& file,
-                        std::size_t numFrames)
+void CloseSimulationFile(H5::H5File& file, std::size_t totalFrames)
 {
     try {
-        H5::Attribute aNf = file.openAttribute("num_frames");
-        hsize_t nf = static_cast<hsize_t>(numFrames);
-        aNf.write(H5::PredType::NATIVE_HSIZE, &nf);
+        Attribute att = file.openAttribute("num_frames");
+        hsize_t nf = static_cast<hsize_t>(totalFrames);
+        att.write(PredType::NATIVE_HSIZE, &nf);
+        
         file.flush(H5F_SCOPE_GLOBAL);
-    } catch (const H5::Exception& e) {
-        std::cerr << "FinalizeFramesFile error: " << e.getDetailMsg() << "\n";
+        file.close();
+    } catch (...) {
+        std::cerr << "Error closing simulation file.\n";
     }
 }

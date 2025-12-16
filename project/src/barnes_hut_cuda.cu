@@ -266,8 +266,9 @@ void CleanupBarnesHutCUDA() {
     if (d_rootIdx) cudaFree(d_rootIdx);
 }
 
-void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause) {
+void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause, int iterations) {
     if (objs.empty() || pause) return;
+    if (iterations < 1) iterations = 1;
 
     size_t N = objs.size();
     if (N > currentCapacity) {
@@ -278,52 +279,67 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause
     std::vector<double4> h_posMass(N);
     std::vector<double3> h_vel(N);
     
-    double minX = 1e30, maxX = -1e30;
-    double minY = 1e30, maxY = -1e30;
-    double minZ = 1e30, maxZ = -1e30;
-
     for (size_t i = 0; i < N; ++i) {
         auto p = objs[i].GetPos();
         h_posMass[i] = make_double4(p.x, p.y, p.z, objs[i].mass);
         h_vel[i] = make_double3(objs[i].velocity.x, objs[i].velocity.y, objs[i].velocity.z);
-
-        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
-        if (p.z < minZ) minZ = p.z; if (p.z > maxZ) maxZ = p.z;
     }
-
-    nodesUsed = 0;
-    double maxSpan = std::max({maxX - minX, maxY - minY, maxZ - minZ});
-    maxSpan *= 1.01; 
-    
-    double cx = (minX + maxX) * 0.5;
-    double cy = (minY + maxY) * 0.5;
-    double cz = (minZ + maxZ) * 0.5;
-
-    int rootBuildIdx = newBuildNode(cx, cy, cz, maxSpan);
-
-    for (int i = 0; i < N; ++i) {
-        insertBody(rootBuildIdx, i, objs[i].GetPos(), objs[i].mass);
-    }
-    computeMassDist(rootBuildIdx);
-
-    int outIdx = 0;
-    int rootGpuIdx = flattenTree(rootBuildIdx, outIdx);
 
     cudaMemcpy(d_posMass, h_posMass.data(), N * sizeof(double4), cudaMemcpyHostToDevice);
     cudaMemcpy(d_vel, h_vel.data(), N * sizeof(double3), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_nodes, hostNodes.data(), outIdx * sizeof(GpuNode), cudaMemcpyHostToDevice);
 
-    int blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
-    computeForcesKernel<<<blocks, THREADS_PER_BLOCK>>>(
-        d_posMass, d_vel, d_acc, d_nodes, N, rootGpuIdx, (double)dt
-    );
-    
-    integratePositionKernel<<<blocks, THREADS_PER_BLOCK>>>(
-        d_posMass, d_vel, N, (double)dt
-    );
-    
-    cudaDeviceSynchronize();
+    for (int iter = 0; iter < iterations; ++iter) {
+        if (iter > 0) {
+            cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost);
+        }
+
+        double minX = 1e30, maxX = -1e30;
+        double minY = 1e30, maxY = -1e30;
+        double minZ = 1e30, maxZ = -1e30;
+
+        for (size_t i = 0; i < N; ++i) {
+            double x = h_posMass[i].x;
+            double y = h_posMass[i].y;
+            double z = h_posMass[i].z;
+
+            if (x < minX) minX = x; if (x > maxX) maxX = x;
+            if (y < minY) minY = y; if (y > maxY) maxY = y;
+            if (z < minZ) minZ = z; if (z > maxZ) maxZ = z;
+        }
+
+        nodesUsed = 0;
+        double maxSpan = std::max({maxX - minX, maxY - minY, maxZ - minZ});
+        maxSpan *= 1.01; 
+        
+        double cx = (minX + maxX) * 0.5;
+        double cy = (minY + maxY) * 0.5;
+        double cz = (minZ + maxZ) * 0.5;
+
+        int rootBuildIdx = newBuildNode(cx, cy, cz, maxSpan);
+
+        for (int i = 0; i < N; ++i) {
+            glm::dvec3 pos(h_posMass[i].x, h_posMass[i].y, h_posMass[i].z);
+            double mass = h_posMass[i].w;
+            insertBody(rootBuildIdx, i, pos, mass);
+        }
+        computeMassDist(rootBuildIdx);
+
+        int outIdx = 0;
+        int rootGpuIdx = flattenTree(rootBuildIdx, outIdx);
+
+        cudaMemcpy(d_nodes, hostNodes.data(), outIdx * sizeof(GpuNode), cudaMemcpyHostToDevice);
+
+        int blocks = (N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
+        computeForcesKernel<<<blocks, THREADS_PER_BLOCK>>>(
+            d_posMass, d_vel, d_acc, d_nodes, N, rootGpuIdx, (double)dt
+        );
+        
+        integratePositionKernel<<<blocks, THREADS_PER_BLOCK>>>(
+            d_posMass, d_vel, N, (double)dt
+        );
+        
+        cudaDeviceSynchronize();
+    }
 
     cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost);
     cudaMemcpy(h_vel.data(), d_vel, N * sizeof(double3), cudaMemcpyDeviceToHost);

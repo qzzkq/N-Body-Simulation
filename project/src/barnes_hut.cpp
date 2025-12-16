@@ -145,52 +145,53 @@ static void deleteTree(OctreeNode* node) {
     delete node;
 }
 
-void simulationStepBarnesHutCPU(std::vector<Object>& objs, float dt, bool pause) {
+void simulationStepBarnesHutCPU(std::vector<Object>& objs, float dt, bool pause, int iterations) {
     if (pause || objs.empty()) return;
+    for (int iter = 0; iter < iterations; ++iter) {
+        auto p0 = objs[0].GetPos();
+        double minX = p0.x, maxX = p0.x;
+        double minY = p0.y, maxY = p0.y;
+        double minZ = p0.z, maxZ = p0.z;
 
-    auto p0 = objs[0].GetPos();
-    double minX = p0.x, maxX = p0.x;
-    double minY = p0.y, maxY = p0.y;
-    double minZ = p0.z, maxZ = p0.z;
+        for (const auto& o : objs) {
+            auto p = o.GetPos();
+            if (p.x < minX) minX = p.x;
+            if (p.x > maxX) maxX = p.x;
+            if (p.y < minY) minY = p.y;
+            if (p.y > maxY) maxY = p.y;
+            if (p.z < minZ) minZ = p.z;
+            if (p.z > maxZ) maxZ = p.z;
+        }
 
-    for (const auto& o : objs) {
-        auto p = o.GetPos();
-        if (p.x < minX) minX = p.x;
-        if (p.x > maxX) maxX = p.x;
-        if (p.y < minY) minY = p.y;
-        if (p.y > maxY) maxY = p.y;
-        if (p.z < minZ) minZ = p.z;
-        if (p.z > maxZ) maxZ = p.z;
+        double spanX = maxX - minX;
+        double spanY = maxY - minY;
+        double spanZ = maxZ - minZ;
+        double side = std::max({spanX, spanY, spanZ});
+        if (side <= 0.0) side = 1.0;
+
+        double cx = 0.5 * (minX + maxX);
+        double cy = 0.5 * (minY + maxY);
+        double cz = 0.5 * (minZ + maxZ);
+
+        OctreeNode* root = new OctreeNode(cx - side * 0.5,
+                                            cy - side * 0.5,
+                                            cz - side * 0.5,
+                                            side);
+
+        for (auto& o : objs) insertBody(root, &o);
+        computeMass(root);
+
+        for (auto& o : objs) {
+            auto p = o.GetPos();
+            double ax = 0.0, ay = 0.0, az = 0.0;
+            accumulateAccel(o, root, p.x, p.y, p.z, ax, ay, az);
+            o.accelerate(static_cast<float>(ax),
+                            static_cast<float>(ay),
+                            static_cast<float>(az),
+                            dt);
+            o.UpdatePos(dt);
+        }
+
+        deleteTree(root);
     }
-
-    double spanX = maxX - minX;
-    double spanY = maxY - minY;
-    double spanZ = maxZ - minZ;
-    double side = std::max({spanX, spanY, spanZ});
-    if (side <= 0.0) side = 1.0;
-
-    double cx = 0.5 * (minX + maxX);
-    double cy = 0.5 * (minY + maxY);
-    double cz = 0.5 * (minZ + maxZ);
-
-    OctreeNode* root = new OctreeNode(cx - side * 0.5,
-                                      cy - side * 0.5,
-                                      cz - side * 0.5,
-                                      side);
-
-    for (auto& o : objs) insertBody(root, &o);
-    computeMass(root);
-
-    for (auto& o : objs) {
-        auto p = o.GetPos();
-        double ax = 0.0, ay = 0.0, az = 0.0;
-        accumulateAccel(o, root, p.x, p.y, p.z, ax, ay, az);
-        o.accelerate(static_cast<float>(ax),
-                     static_cast<float>(ay),
-                     static_cast<float>(az),
-                     dt);
-        o.UpdatePos(dt);
-    }
-
-    deleteTree(root);
 }

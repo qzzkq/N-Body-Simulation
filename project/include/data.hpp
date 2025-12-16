@@ -5,13 +5,8 @@
 #include <vector>
 #include <string>
 #include <glm/glm.hpp>
-
-class Object;
-
-// Вперё объявляем H5::H5File, чтобы не тащить H5Cpp.h в заголовок
-namespace H5 {
-    class H5File;
-}
+#include "H5Cpp.h"
+#include "object.hpp"
 
 struct Particle {
     glm::dvec3 position;
@@ -19,6 +14,12 @@ struct Particle {
     double     mass;
     double     radius;
 };
+
+H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodies, double dt);
+
+void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std::size_t frameIndex);
+
+void CloseSimulationFile(H5::H5File& file, std::size_t totalFrames);
 
 void Writer(const std::string& fileName,
             const std::string& dsetName,
@@ -33,16 +34,4 @@ bool LoadObjectsFromFile(const std::string& filePath,
                          const std::string& dsetName,
                          std::vector<Object>& outObjs);
 
-H5::H5File OpenFramesFile(const std::string& fileName,
-                          std::size_t numBodies);
-
-void WriteFrame(H5::H5File& file,
-                const std::vector<Object>& objs,
-                double t,
-                std::size_t frameIndex,
-                const std::string& prefix = "frame");
-
-void FinalizeFramesFile(H5::H5File& file,
-                        std::size_t numFrames);
-
-#endif // DATA_HPP
+#endif

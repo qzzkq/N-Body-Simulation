@@ -23,6 +23,8 @@
 #include "renderer.hpp"
 #include "control.hpp"
 
+using namespace H5;
+
 bool running = true;
 bool pause   = false;
 
@@ -105,25 +107,6 @@ GLFWwindow* StartGLU() {
     return window;
 }
 
-
-struct Frame0Record {
-    glm::dvec3 position;
-    double     mass;
-    double     radius;
-};
-
-static H5::CompType MakeFrame0TypeReplay()
-{
-    hsize_t v3dims[1] = {3};
-    H5::ArrayType vec3Type(H5::PredType::NATIVE_DOUBLE, 1, v3dims);
-
-    H5::CompType t(sizeof(Frame0Record));
-    t.insertMember("position", HOFFSET(Frame0Record, position), vec3Type);
-    t.insertMember("mass",     HOFFSET(Frame0Record, mass),     H5::PredType::NATIVE_DOUBLE);
-    t.insertMember("radius",   HOFFSET(Frame0Record, radius),   H5::PredType::NATIVE_DOUBLE);
-    return t;
-}
-
 void colorFromMass(std::vector<Object>& objs) {
     if (objs.empty()) return;
 
@@ -172,12 +155,33 @@ void colorFromMass(std::vector<Object>& objs) {
     }
 }
 
+
+struct InitRecord {
+    glm::dvec3 position;
+    double     mass;
+    double     radius;
+};
+
+static CompType GetInitType() {
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+    CompType t(sizeof(InitRecord));
+    t.insertMember("position", HOFFSET(InitRecord, position), vec3Type);
+    t.insertMember("mass",     HOFFSET(InitRecord, mass),     PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   HOFFSET(InitRecord, radius),   PredType::NATIVE_DOUBLE);
+    return t;
+}
+
+static ArrayType GetPosType() {
+    hsize_t v3dims[1] = {3};
+    return ArrayType(PredType::NATIVE_DOUBLE, 1, v3dims);
+}
+
 int main(int argc, char** argv) {
 #ifdef _WIN32
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
 #endif
-
     H5::Exception::dontPrint();
 
     if (argc < 2) {
@@ -187,162 +191,126 @@ int main(int argc, char** argv) {
 
     std::string fileName = argv[1];
 
-    H5::H5File file(fileName, H5F_ACC_RDONLY);
-
-    std::size_t numFrames = 0;
-    while (true) {
-        char dsetName[64];
-        std::snprintf(dsetName, sizeof(dsetName), "frame_%06zu", numFrames);
-        try {
-            file.openDataSet(dsetName).close();
-            ++numFrames;
-        } catch (const H5::Exception&) {
-            break;
-        }
-    }
-
-    if (numFrames == 0) {
-        std::cerr << "В файле " << fileName
-                  << " не найдено ни одного кадра frame_XXXXXX.\n";
-        return 1;
-    }
-    char firstName[64];
-    std::snprintf(firstName, sizeof(firstName), "frame_%06d", 0);
-
-    H5::DataSet ds0 = file.openDataSet(firstName);
-    H5::DataSpace sp0 = ds0.getSpace();
-
-    hsize_t dims[1] = {0};
-    sp0.getSimpleExtentDims(dims);
-    std::size_t numBodies = static_cast<std::size_t>(dims[0]);
-    if (numBodies == 0) {
-        std::cerr << "Первый кадр пустой.\n";
-        return 1;
-    }
-
-    std::vector<Frame0Record> firstFrame(numBodies);
-    H5::CompType t0 = MakeFrame0TypeReplay();
-    ds0.read(firstFrame.data(), t0);
-
-    double initialTime = 0.0;
+    H5File file;
     try {
-        H5::Attribute timeAttr = ds0.openAttribute("time");
-        timeAttr.read(H5::PredType::NATIVE_DOUBLE, &initialTime);
-    } catch (...) {
-        initialTime = 0.0;
+        file.openFile(fileName, H5F_ACC_RDONLY);
+    } catch(...) {
+        std::cerr << "Failed to open file.\n";
+        return 1;
     }
 
-    std::cout << "Файл: " << fileName
-              << "\n  num_bodies (detected) = " << numBodies
-              << "\n  num_frames (detected) = " << numFrames
-              << "\n  t0 = " << initialTime << " s\n";
+    hsize_t numBodiesH5 = 0;
+    hsize_t numFramesH5 = 0;
+    double fileDt = 1.0/10;
+
+    try {
+        file.openAttribute("num_bodies").read(PredType::NATIVE_HSIZE, &numBodiesH5);
+        file.openAttribute("num_frames").read(PredType::NATIVE_HSIZE, &numFramesH5);
+        file.openAttribute("dt").read(PredType::NATIVE_DOUBLE, &fileDt);
+    } catch (...) {
+        std::cerr << "Error File header missing.\n";
+        return 1;
+    }
+
+    size_t numBodies = (size_t)numBodiesH5;
+    size_t numFrames = (size_t)numFramesH5;
+
+    std::cout << "Opened: " << fileName << "\n"
+              << "  Bodies: " << numBodies << "\n"
+              << "  Frames: " << numFrames << "\n"
+              << "  DT: " << fileDt << " s\n";
+
+    if (numBodies == 0 || numFrames == 0) return 1;
+
+    objs.clear();
+    objs.reserve(numBodies);
+    try {
+        DataSet initSet = file.openDataSet("initial_data");
+        std::vector<InitRecord> initBuf(numBodies);
+        initSet.read(initBuf.data(), GetInitType());
+
+        for (const auto& rec : initBuf) {
+            Object o(rec.position, glm::dvec3(0), rec.mass, 1410.0f, std::nullopt);
+            o.Initalizing = false;
+            o.radius = (float)rec.radius;
+            objs.push_back(o);
+        }
+    } catch(...) {
+        std::cerr << "Error reading /initial_data.\n";
+        return 1;
+    }
+    colorFromMass(objs);
+
+    DataSet tracksSet;
+    try {
+        tracksSet = file.openDataSet("tracks");
+    } catch(...) {
+        std::cerr << "Error opening /tracks.\n";
+        return 1;
+    }
 
     GLFWwindow* window = StartGLU();
-    if (!window) {
-        return 1;
-    }
+    if (!window) return 1;
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-
     Renderer renderer(width, height, vertexShaderSource, fragmentShaderSource);
-    renderer.setProjection(65.0f, (float) width/ (float) height, 8.3f, 100000.0f);
+    renderer.setProjection(65.0f, (float)width/height, 0.1f, 100000.0f);
 
     cameraPos   = glm::vec3(0.0f, 50.0f, 250.0f);
     cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
     cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
 
-    objs.clear();
-    objs.reserve(numBodies);
-    for (const auto& r : firstFrame) {
-        Object o(r.position,
-                 glm::dvec3(0.0),  // скорость в реплее не нужна
-                 r.mass,
-                 1410.0f,
-                 std::nullopt);
-        o.Initalizing = false;
-        o.radius = static_cast<float>(r.radius);
-        if (!std::isfinite(o.radius) || o.radius <= 0.0f) {
-            o.radius = 1.0f;
-        }
-        objs.push_back(std::move(o));
-    }
+    renderer.setRenderMode(RenderMode::Sphere);
+    
+    float initMass = 1.0f;
 
-    colorFromMass(objs);
-
-    float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
-
-    Control control(window, objs,
-                    cameraPos, cameraFront, cameraUp,
-                    dt, timeScale, pause, running,
-                    yaw, pitch, lastX, lastY,
-                    initMass);
+    Control control(window, objs, cameraPos, cameraFront, cameraUp, dt, timeScale, pause, running, yaw, pitch, lastX, lastY, initMass);
     control.attach();
 
-    std::size_t currentFrame = 0;
-    double currentSimTime    = initialTime;
+    double playbackTime = 0.0;
+    double maxTime = (numFrames - 1) * fileDt;
 
-    hsize_t v3dims[1] = {3};
-    H5::ArrayType vec3Type(H5::PredType::NATIVE_DOUBLE, 1, v3dims);
+    double lastRealTime = glfwGetTime();
 
-    const double baseFrameDt = 1.0 / 60.0; // виртуальный шаг между кадрами
-    double frameAccumulator  = 0.0;
+    size_t currentFrameIdx = 0;
+    size_t lastReadFrameIdx = 99999999999;
 
-    double lastTime = glfwGetTime();
+    std::vector<glm::dvec3> posBuffer(numBodies);
 
     while (!glfwWindowShouldClose(window) && running) {
         double now = glfwGetTime();
-        double realDt = now - lastTime;
-        lastTime = now;
+        double realDt = now - lastRealTime;
+        lastRealTime = now;
+        dt = (float)realDt;
 
-        dt = static_cast<float>(realDt);
+        if (!pause) {
+            playbackTime += realDt * timeScale;
+        }
 
-        float clampedTimeScale = std::max(0.0f, timeScale);
+        if (playbackTime > maxTime) playbackTime = 0.0;
+        if (playbackTime < 0.0) playbackTime = maxTime;
 
-        if (!pause && clampedTimeScale > 0.0f && numFrames > 1) {
-            frameAccumulator += realDt * static_cast<double>(clampedTimeScale);
+        currentFrameIdx = (size_t)(playbackTime / fileDt);
+        if (currentFrameIdx >= numFrames) currentFrameIdx = numFrames - 1;
 
-            while (frameAccumulator >= baseFrameDt &&
-                   currentFrame + 1 < numFrames) {
-                ++currentFrame;
-                frameAccumulator -= baseFrameDt;
+        if (currentFrameIdx != lastReadFrameIdx) {
+            hsize_t offset[2] = { static_cast<hsize_t>(currentFrameIdx), 0 };
+            hsize_t count[2]  = { 1, static_cast<hsize_t>(numBodies) };
+            
+            DataSpace fileSpace = tracksSet.getSpace();
+            fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 
-                char dsetName[64];
-                std::snprintf(dsetName, sizeof(dsetName),
-                              "frame_%06zu", currentFrame);
+            hsize_t memDims[2] = { 1, static_cast<hsize_t>(numBodies) };
+            DataSpace memSpace(2, memDims);
 
-                try {
-                    H5::DataSet dset = file.openDataSet(dsetName);
-                    H5::DataSpace sp = dset.getSpace();
+            tracksSet.read(posBuffer.data(), GetPosType(), memSpace, fileSpace);
 
-                    hsize_t dimsPos[1] = {0};
-                    sp.getSimpleExtentDims(dimsPos);
-                    if (dimsPos[0] != numBodies) {
-                        std::cerr << "Размер кадра " << dsetName
-                                  << " не совпадает с numBodies\n";
-                        break;
-                    }
-
-                    std::vector<glm::dvec3> pos(numBodies);
-                    dset.read(pos.data(), vec3Type);
-
-                    for (std::size_t i = 0; i < objs.size(); ++i) {
-                        objs[i].position = pos[i];
-                    }
-
-                    currentSimTime = currentFrame * baseFrameDt;
-                    try {
-                        H5::Attribute timeAttr = dset.openAttribute("time");
-                        timeAttr.read(H5::PredType::NATIVE_DOUBLE, &currentSimTime);
-                    } catch (...) {
-                    }
-                }
-                catch (const std::exception& e) {
-                    std::cerr << "Ошибка при чтении " << dsetName << ": "
-                              << e.what() << "\n";
-                    break;
-                }
+            for (size_t i = 0; i < numBodies; ++i) {
+                objs[i].position = posBuffer[i];
             }
+
+            lastReadFrameIdx = currentFrameIdx;
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -350,9 +318,8 @@ int main(int argc, char** argv) {
         renderer.drawObjects(objs);
 
         std::snprintf(title, sizeof(title),
-                      "Replay | frame %zu / %zu | t = %.3f s | speed x%.2f",
-                      currentFrame, numFrames - 1,
-                      currentSimTime, clampedTimeScale);
+                      "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
+                      playbackTime, maxTime, currentFrameIdx, timeScale);
         glfwSetWindowTitle(window, title);
 
         glfwSwapBuffers(window);
