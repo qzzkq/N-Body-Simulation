@@ -4,38 +4,42 @@
 #include <vector>
 #include "object.hpp"
 
+enum class RenderMode { Sphere, Points, Cubes };
+
 class Renderer {
 public:
-    // режим визуализации, выбираем его из main
-    enum class Mode {
-        Sphere = 0,  // исходный вариант: рисуем треугольниками из VAO
-        Points,      // одна точка на объект
-        Cubes        // куб вместо объекта
-    };
-
-    Renderer(int width, int height,
-             const char* vertexSrc,
-             const char* fragmentSrc);
+    Renderer(int w, int h, const char* vs, const char* fs);
     ~Renderer();
 
     void setProjection(float fov_deg, float aspect, float znear, float zfar);
-    void updateView(const glm::vec3& pos,
-                    const glm::vec3& front,
-                    const glm::vec3& up);
-
+    void updateView(const glm::vec3& pos, const glm::vec3& front, const glm::vec3& up);
     void drawObjects(const std::vector<Object>& objs) const;
-    void setMode(Mode m) { mode_ = m; }
-    Mode getMode() const { return mode_; }
+    
+    void setRenderMode(RenderMode mode) { mode_ = mode; }
 
 private:
-    GLuint program_ = 0;
-    GLint  uModel_ = -1, uView_ = -1, uProj_ = -1, uColor_ = -1;
+    GLuint compileProgram(const char* vs, const char* fs);
+    
+    // Инициализаторы геометрии
+    void initSphereGeometry();
+    void initCubeGeometry();  
+    void initPointGeometry(); 
 
-    GLuint gridVAO_ = 0, gridVBO_ = 0;
-    size_t gridVertexCount_ = 0;
+    GLuint program_;
+    GLint uModel_, uView_, uProj_, uColor_;
+    
+    RenderMode mode_ = RenderMode::Cubes; 
 
-    // выбранный режим отрисовки
-    Mode mode_ = Mode::Sphere;
+    // VAO и VBO для сферы 
+    GLuint sphereVAO_ = 0;
+    GLuint sphereVBO_ = 0;
+    size_t sphereVertexCount_ = 0;
 
-    static GLuint compileProgram(const char* vs, const char* fs);
+    // VAO и VBO для куба 
+    GLuint cubeVAO_ = 0;
+    GLuint cubeVBO_ = 0;
+
+    // VAO и VBO для точки 
+    GLuint pointVAO_ = 0;
+    GLuint pointVBO_ = 0;
 };

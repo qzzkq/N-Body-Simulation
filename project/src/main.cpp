@@ -140,7 +140,6 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
 
     center.Initalizing = false;
     center.radius = RadiusKm(center.mass, center.density);
-    center.UpdateVertices();
     out.push_back(center);
 
     if (N <= 0) return;
@@ -172,7 +171,6 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
         Object o(pos, tdir * v_kmps, satMassBase, 1410.0f, std::nullopt);
         o.Initalizing = false;
         o.radius = RadiusKm(o.mass, o.density);
-        o.UpdateVertices();
 
         out.push_back(std::move(o));
     }
@@ -187,7 +185,6 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause)
         Object& obj = objs[i];
         if (obj.Initalizing) {
             obj.radius = std::pow((3.0 * obj.mass / obj.density) / (4.0 * 3.14159265359), 1.0/3.0) / 100000.0;
-            obj.UpdateVertices();
         }
 
         for (size_t j = i + 1; j < objs.size(); ++j) {
@@ -413,10 +410,6 @@ int main() {
         glfwPollEvents();
     }
 
-    for (auto& obj : objs) {
-        glDeleteVertexArrays(1, &obj.VAO);
-        glDeleteBuffers(1, &obj.VBO);
-    }
     FinalizeFramesFile(framesFile, frameIndex);
     glfwTerminate();
     return 0;

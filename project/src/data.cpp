@@ -161,8 +161,6 @@ bool LoadObjectsFromFile(const std::string& filePath,
                 o.radius = 1.0f;
             }
         }
-
-        o.UpdateVertices();
         outObjs.push_back(std::move(o));
     }
 

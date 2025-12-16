@@ -265,7 +265,6 @@ int main(int argc, char** argv) {
         if (!std::isfinite(o.radius) || o.radius <= 0.0f) {
             o.radius = 1.0f;
         }
-        o.UpdateVertices();
         objs.push_back(std::move(o));
     }
 
@@ -329,7 +328,6 @@ int main(int argc, char** argv) {
 
                     for (std::size_t i = 0; i < objs.size(); ++i) {
                         objs[i].position = pos[i];
-                        objs[i].UpdateVertices();
                     }
 
                     currentSimTime = currentFrame * baseFrameDt;
@@ -359,11 +357,6 @@ int main(int argc, char** argv) {
 
         glfwSwapBuffers(window);
         glfwPollEvents();
-    }
-
-    for (auto& obj : objs) {
-        glDeleteVertexArrays(1, &obj.VAO);
-        glDeleteBuffers(1, &obj.VBO);
     }
 
     glfwTerminate();
