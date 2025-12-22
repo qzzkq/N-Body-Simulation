@@ -451,7 +451,7 @@ int main() {
     double accumulator = 0.0;
 
     bool isRealTime;
-    std::cout << "Режим реального времени? [1 - Да / 2 Нет]: " << std::flush;
+    std::cout << "Режим реального времени? [1 - Да / 0 Нет]: " << std::flush;
     std::cin >> isRealTime;
 
     int stepCounter = 0;
