@@ -69,7 +69,7 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
     if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos_ -= cameraSpeed * cameraUp_;
 
     // Ускорение/замедление времени
-    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) timeScale_ = std::min(timeScale_ * 1.1f, 1000.0f);
+    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) timeScale_ = std::min(timeScale_ * 1.1f, 100000.0f);
     if (glfwGetKey(window_, GLFW_KEY_MINUS)   == GLFW_PRESS) timeScale_ = std::max(timeScale_ / 1.1f, 0.05f);
     
     // Пауза на K

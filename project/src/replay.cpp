@@ -275,7 +275,8 @@ int main(int argc, char** argv) {
 
     size_t currentFrameIdx = 0;
     size_t lastReadFrameIdx = 99999999999;
-
+    size_t pageNumber = 0;
+    
     std::vector<glm::dvec3> posBuffer(numBodies);
 
     while (!glfwWindowShouldClose(window) && running) {

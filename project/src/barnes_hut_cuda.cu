@@ -7,7 +7,7 @@
 #include "object.hpp"
 
 #define THREADS_PER_BLOCK 256
-#define MAX_STACK 256
+#define MAX_STACK 64
 #define THETA 0.5
 #define G_CONST 6.6743e-20
 
@@ -338,7 +338,6 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause
             d_posMass, d_vel, N, (double)dt
         );
         
-        cudaDeviceSynchronize();
     }
 
     cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost);

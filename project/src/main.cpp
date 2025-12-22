@@ -47,7 +47,7 @@ float lastFrame = 0.0f;
 
 double gSimTime = 0.0;
 float timeScale = 1.0f; // переменная для ускорения/замедления времени
-float fixedDt = 1.0f / 10; // шаг времени;
+float fixedDt = 1.0f/60; // шаг времени;
 float grid_size2  = 400.0f;
 int   vert_count2 = 10;
 const int FIXED_STEPS = 10;
@@ -184,6 +184,71 @@ void spawnSystem(std::vector<Object>& out, int N, double centralMass, double sat
     colorFromMass(out);
 }
 
+void spawnSystem8Balls(std::vector<Object>& out, int N, double centralMass, double satMassBase,
+                       float rMin_km, float rMax_km, float ballRadius, unsigned seed /*= 42*/) 
+{
+    out.clear();
+    out.reserve(static_cast<size_t>(N) + 1);
+
+    Object center(glm::vec3(0), glm::vec3(0), centralMass, 141000.0f, std::nullopt);
+    center.Initalizing = false;
+    center.radius = RadiusKm(center.mass, center.density);
+    out.push_back(center);
+
+    if (N <= 0) return;
+
+    std::mt19937 rng(seed);
+    std::uniform_real_distribution<float> u01(0.0f, 1.0f);
+    std::uniform_real_distribution<float> uMinus1_1(-1.0f, 1.0f);
+
+    const int numClusters = 8;
+    float orbitRadius = (rMin_km + rMax_km) * 0.5f;
+
+    for (int i = 0; i < N; ++i) {
+        int clusterIdx = i % numClusters;
+        
+        float clusterAngle = (2.0f * 3.14159265359f / static_cast<float>(numClusters)) * clusterIdx;
+
+        glm::vec3 clusterCenter(
+            orbitRadius * std::cos(clusterAngle),
+            0.0f,
+            orbitRadius * std::sin(clusterAngle)
+        );
+
+        
+        glm::vec3 randomPoint;
+        float x, y, z, d2;
+        do {
+            x = uMinus1_1(rng);
+            y = uMinus1_1(rng);
+            z = uMinus1_1(rng);
+            d2 = x*x + y*y + z*z;
+        } while (d2 > 1.0f || d2 < 0.0001f); 
+
+        float scale = ballRadius * std::cbrt(u01(rng)) / std::sqrt(d2); 
+        
+        glm::vec3 offset(x * scale, y * scale, z * scale);
+
+        glm::vec3 pos = clusterCenter + offset;
+
+        double dist = std::sqrt(static_cast<double>(pos.x*pos.x + pos.z*pos.z)); 
+        
+        float angle = std::atan2(pos.z, pos.x);
+        glm::vec3 tdir(-std::sin(angle), 0.0f, std::cos(angle));
+
+        double v_circ_mps = std::sqrt((G * centralMass) / (dist * 1000.0));
+        float  v_kmps     = static_cast<float>(v_circ_mps / 1000.0f) * VEL_SCALE;
+
+        Object o(pos, tdir * v_kmps, satMassBase, 1410.0f, std::nullopt);
+        o.Initalizing = false;
+        o.radius = RadiusKm(o.mass, o.density);
+
+        out.push_back(std::move(o));
+    }
+
+    colorFromMass(out);
+}
+
 void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause, int iterations) {
     for (int iter = 0; iter < iterations; ++iter) {
         for (size_t i = 0; i < objs.size(); ++i) {
@@ -213,7 +278,7 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause,
                     obj.accelerate(accObj.x, accObj.y, accObj.z, dt);
                     obj2.accelerate(accObj2.x, accObj2.y, accObj2.z, dt);
                 }
-
+                /*
                 if (distance < combinedRadius) {
                     glm::vec3 normal = glm::vec3(dir);
                     glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
@@ -241,9 +306,8 @@ void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause,
                             obj2.position += correction * invMass2;
                         }
                     }
-                }
+                */
             }
-
             if (!pause) {
                 obj.UpdatePos(dt);
             }
@@ -362,6 +426,7 @@ int main() {
         std::cout << "Сколько тел загружаем?: " << std::flush;
         std::cin >> numObjs;
         spawnSystem(objs, numObjs, M_central, M_sat_base, /*rMin*/300.0f, /*rMax*/10000.0f, 1000.0f,/*seed*/42);
+        // spawnSystem8Balls(objs, numObjs, M_central, M_sat_base, 300.0f, 10000.0f, 1000.0f, 42);
     }
 
     H5::H5File framesFile = CreateSimulationFile("data/frames.h5", objs.size(), fixedDt * static_cast<double>(FIXED_STEPS));
@@ -386,7 +451,7 @@ int main() {
     double accumulator = 0.0;
 
     bool isRealTime;
-    std::cout << "Режим реального времени? [1 - Да, смотреть / 0 - Нет, быстро считать]: " << std::flush;
+    std::cout << "Режим реального времени? [1 - Да / 2 Нет]: " << std::flush;
     std::cin >> isRealTime;
 
     int stepCounter = 0;
@@ -396,7 +461,6 @@ int main() {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
             
-            if (frameRealDt > 0.1) frameRealDt = 0.1;
 
             dt = frameRealDt;
             lastTime = now;
@@ -404,23 +468,12 @@ int main() {
             accumulator += frameRealDt;
 
             int substeps = 0;
-            const int MAX_SUBSTEPS = 10;
 
-            while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS) {
+            while (accumulator >= fixedDt) {
                 simulationStep(objs, fixedDt, pause, 1);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
-
-                stepCounter++;
-                if (stepCounter % FIXED_STEPS == 0) {
-                    WriteSimulationFrame(framesFile, objs, frameIndex);
-                    ++frameIndex;
-                }
-            }
-
-            if (accumulator > fixedDt) {
-                accumulator = 0.0;
             }
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

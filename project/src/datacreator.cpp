@@ -1,6 +1,7 @@
 #include <vector>
 #include <string>
 #include <iostream>
+#include <fstream>
 #include <glm/glm.hpp>
 #include <filesystem>
 #include <cmath>
@@ -8,7 +9,7 @@
 #include "H5Cpp.h"
 #include "object.hpp"
 using namespace H5;
-
+namespace fs = std::filesystem;
 struct Particle {
     glm::dvec3 position;
     glm::dvec3 velocity;
@@ -109,115 +110,51 @@ std::vector<std::string> ListH5Files(const std::string& dir) {
 }
 
 
-int main() {
-    std::vector<Particle> parts;
-
-    // --- Реальные массы (кг), только для ОТНОСИТЕЛЬНЫХ соотношений ---
-    const double mass_sun     = 1.9885e30;
-    const double mass_mercury = 3.3011e23;
-    const double mass_venus   = 4.8675e24;
-    const double mass_earth   = 5.97237e24;
-    const double mass_mars    = 6.4171e23;
-    const double mass_jupiter = 1.8982e27;
-    const double mass_saturn  = 5.6834e26;
-    const double mass_uranus  = 8.6810e25;
-    const double mass_neptune = 1.02413e26;
-
-    // Средние расстояния от Солнца (в а.е.)
-    const double a_mercury = 0.387;
-    const double a_venus   = 0.723;
-    const double a_earth   = 1.0;
-    const double a_mars    = 1.524;
-    const double a_jupiter = 5.203;
-    const double a_saturn  = 9.537;
-    const double a_uranus  = 19.191;
-    const double a_neptune = 30.07;
-
-    // --- Эталонные единицы из рабочего 3bodies-примера ---
-    const double MASS_REF = 1.0e22;  // масса "типичного" тела в исходном примере
-    const double DIST_REF = 60.0;    // расстояние между телами в исходном примере
-    const double V_REF    = 1.0;     // скорость в исходном примере
-
-    // Масштаб масс: делаем так, чтобы Солнце имело массу MASS_REF
-    const double MASS_SCALE = MASS_REF / mass_sun;
-
-    auto mass_sim = [&](double m_real) {
-        return m_real * MASS_SCALE;
-    };
-
-    // Масштаб расстояния: Земля -> радиус = DIST_REF (как в 3bodies)
-    const double DIST_SCALE = DIST_REF / a_earth;  // = 60.0
-
-    // Радиусы чисто визуальные
-    const double radius_sun_sim    = 4.0;
-    const double radius_planet_sim = 1.0;
-
-    // Коэффициент по скорости: чуть меньше "круговой" — устойчивые эллипсы
-    const double V_FACTOR = 0.8;
-
-    // Приближённая оценка "круговой" скорости в тех же юнитах, что и в 3bodies:
-    // v_circ ≈ V_REF * sqrt(2 * DIST_REF / r)
-    auto estimate_circular_velocity = [&](double r_sim) {
-        return V_REF * std::sqrt(2.0 * DIST_REF / r_sim);
-    };
-
-    // --- Солнце в центре ---
-    {
-        Particle sun;
-        sun.position = glm::dvec3(0.0, 0.0, 0.0);
-        sun.velocity = glm::dvec3(0.0, 0.0, 0.0);
-        sun.mass     = mass_sim(mass_sun);  // == MASS_REF
-        sun.radius   = radius_sun_sim;
-        parts.push_back(sun);
+int main(int argc, char* argv[]) {
+    if (argc < 2) {
+        std::cerr << "Usage: " << argv[0] << " <input_file.txt>" << std::endl;
+        return 1;
     }
 
-    // Хелпер для добавления планет на (почти) круговые орбиты
-    auto add_planet = [&](double a_AU, double m_real) {
-        double r_sim  = a_AU * DIST_SCALE;          // расстояние в сим-юнитах
-        double v_circ = estimate_circular_velocity(r_sim);
-        double v_sim  = V_FACTOR * v_circ;          // чуть меньше круговой
+    std::string inputFileName = argv[1];
+    std::ifstream inFile(inputFileName);
 
+    if (!inFile.is_open()) {
+        std::cerr << "Error: Could not open file " << inputFileName << std::endl;
+        return 1;
+    }
+
+    std::vector<Particle> parts;
+    double px, py, pz, vx, vy, vz, m, r;
+
+    while (inFile >> px >> py >> pz >> vx >> vy >> vz >> m >> r) {
         Particle p;
-        p.position = glm::dvec3(r_sim, 0.0, 0.0);   // на оси X
-        p.velocity = glm::dvec3(0.0,  v_sim, 0.0);  // скорость вдоль +Y
-        p.mass     = mass_sim(m_real);
-        p.radius   = radius_planet_sim;
+        p.position = glm::dvec3(px, py, pz);
+        p.velocity = glm::dvec3(vx, vy, vz);
+        p.mass = m;
+        p.radius = r;
         parts.push_back(p);
-    };
+    }
 
-    // --- Планеты ---
-    add_planet(a_mercury, mass_mercury);
-    add_planet(a_venus,   mass_venus);
-    add_planet(a_earth,   mass_earth);
-    add_planet(a_mars,    mass_mars);
-    add_planet(a_jupiter, mass_jupiter);
-    add_planet(a_saturn,  mass_saturn);
-    add_planet(a_uranus,  mass_uranus);
-    add_planet(a_neptune, mass_neptune);
+    if (parts.empty()) {
+        std::cerr << "Warning: No data read from file or format is incorrect." << std::endl;
+        return 1;
+    }
 
-    // --- ТЯЖЁЛОЕ ПРОЛЁТНОЕ ТЕЛО ("чёрная дыра" или звезда-нарушитель) ---
+    fs::path p(inputFileName);
+    std::string outputFileName = p.replace_extension(".h5").string();
 
-    // Пусть оно в 5 раз тяжелее Солнца по массе:
-    const double mass_intruder_real = 5.0 * mass_sun;
-
-    Particle intr;
-    intr.mass   = mass_sim(mass_intruder_real); // ~ 5 * MASS_REF
-    intr.radius = 3.0;
-
-    // Стартовая позиция: снаружи орбиты Сатурна, на окраине системы
-    // Немного смещаем по X и Y, чтобы траектория прошла "насквозь"
-    intr.position = glm::dvec3(-500.0, 300.0, 0.0);
-
-    // Скорость направлена примерно к центру,
-    // по величине сравнима со скоростями планет.
-    intr.velocity = glm::dvec3(1.0, -0.5, 0.0);
-
-    parts.push_back(intr);
-
-    // --- Запись HDF5 ---
-    Writer("data/solar_system_intruder.h5", "Particles", parts);
-    std::cout << "Saved " << parts.size()
-              << " bodies to data/solar_system_intruder.h5\n";
+    try {
+        Writer(outputFileName, "Particles", parts);
+        std::cout << "Successfully read " << parts.size() << " objects." << std::endl;
+        std::cout << "Saved to " << outputFileName << std::endl;
+    } catch (const FileIException& error) {
+        error.printErrorStack();
+        return -1;
+    } catch (const DataSetIException& error) {
+        error.printErrorStack();
+        return -1;
+    }
 
     return 0;
 }
