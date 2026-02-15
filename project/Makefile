@@ -1,81 +1,79 @@
-TARGET        = nBodySim
-REPLAY_TARGET = replay
+TARGET        := nBodySim
+REPLAY_TARGET := replay
+CREATOR_TARGET := datacreator
 
-SRC_DIR = src
-INC_DIR = include
+SRC_DIR   := src
+INC_DIR   := include
+ALGO_DIR  := algo
+BUILD_DIR := build
 
-CXX  = h5c++
-NVCC = nvcc
+CXX  := h5c++
+NVCC := nvcc
 
-# ==== CUDA включаем по умолчанию (для коллег) ====
-# На твоём компе без CUDA:  make USE_CUDA=0
 USE_CUDA ?= 1
+CUDA_ARCH ?= -arch=sm_75
 
-CXXFLAGS  = -O3 -std=c++17 -I$(INC_DIR)
-LDFLAGS   = $(shell pkg-config --cflags --libs glew glfw3) -lGL
+OPT_FLAGS := -O3 -march=native -ffast-math -flto
 
-# ---------- CUDA-настройки (только если USE_CUDA=1) ----------
+PKG_LIBS  := $(shell pkg-config --cflags --libs glew glfw3)
+DEPFLAGS  := -MMD -MP
+
+CXXFLAGS  := $(OPT_FLAGS) -std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) $(DEPFLAGS)
+LIBS      := $(PKG_LIBS) -lGL
+
 ifeq ($(USE_CUDA),1)
-    CUDA_ARCH_FLAGS = -arch=sm_75
-    NVCCFLAGS = -O3 $(CUDA_ARCH_FLAGS) --std=c++17 -I$(INC_DIR)
-
-    # Макрос для кода, чтобы отличать сборку с CUDA
+    NVCCFLAGS := -O3 $(CUDA_ARCH) --std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) -MD
     CXXFLAGS += -DUSE_CUDA
+    LIBS     += -lcudart
 
-    # Линкуем с CUDA runtime
-    LDFLAGS += -lcudart
-
-    CU_SRCS  = $(wildcard $(SRC_DIR)/*.cu)
-    OBJS_CU  = $(CU_SRCS:.cu=.o)
+    CU_SRCS  := $(wildcard $(SRC_DIR)/*.cu) $(wildcard $(ALGO_DIR)/*.cu)
+    OBJS_CU  := $(CU_SRCS:%.cu=$(BUILD_DIR)/%.o)
 else
-    CU_SRCS  =
-    OBJS_CU  =
+    CU_SRCS  :=
+    OBJS_CU  :=
 endif
 
-# ---------- Список всех .cpp ----------
-ALL_CPP_SRCS = $(wildcard $(SRC_DIR)/*.cpp)
+ALL_CPP_SRCS := $(wildcard $(SRC_DIR)/*.cpp) $(wildcard $(ALGO_DIR)/*.cpp)
 
-# ---------- .cpp для основного симулятора (без datacreator.cpp и replay.cpp) ----------
-SIM_CPP_SRCS = $(filter-out \
-    $(SRC_DIR)/datacreator.cpp \
-    $(SRC_DIR)/replay.cpp, \
-    $(ALL_CPP_SRCS))
+SIM_CPP_SRCS := $(filter-out $(SRC_DIR)/datacreator.cpp $(SRC_DIR)/replay.cpp, $(ALL_CPP_SRCS))
+SIM_OBJS     := $(SIM_CPP_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-SIM_OBJS = $(SIM_CPP_SRCS:.cpp=.o)
+REPLAY_SRCS  := $(SRC_DIR)/replay.cpp $(SRC_DIR)/object.cpp $(SRC_DIR)/renderer.cpp $(SRC_DIR)/control.cpp $(SRC_DIR)/physics.cpp
+REPLAY_OBJS  := $(REPLAY_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-# ---------- .cpp для реплея ----------
-REPLAY_SRCS = \
-    $(SRC_DIR)/replay.cpp \
-    $(SRC_DIR)/object.cpp \
-    $(SRC_DIR)/renderer.cpp \
-    $(SRC_DIR)/control.cpp
+CREATOR_SRCS := $(SRC_DIR)/datacreator.cpp $(SRC_DIR)/object.cpp 
+CREATOR_OBJS := $(CREATOR_SRCS:%.cpp=$(BUILD_DIR)/%.o)
 
-REPLAY_OBJS = $(REPLAY_SRCS:.cpp=.o)
+DEPS := $(SIM_OBJS:.o=.d) $(REPLAY_OBJS:.o=.d) $(CREATOR_OBJS:.o=.d) $(OBJS_CU:.o=.d)
 
-# ---------- Таргеты по умолчанию ----------
-all: $(TARGET)
+.PHONY: all clean run
 
-# ---------- Основной бинарник с симуляцией ----------
+all: $(TARGET) $(REPLAY_TARGET) $(CREATOR_TARGET)
+
 $(TARGET): $(SIM_OBJS) $(OBJS_CU)
-	$(CXX) $(SIM_OBJS) $(OBJS_CU) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(SIM_OBJS) $(OBJS_CU) -o $@ $(LIBS)
 
-# ---------- Бинарник реплея ----------
 $(REPLAY_TARGET): $(REPLAY_OBJS)
-	$(CXX) $(CXXFLAGS) $(REPLAY_OBJS) -o $@ $(LDFLAGS)
+	$(CXX) $(CXXFLAGS) $(REPLAY_OBJS) -o $@ $(LIBS)
 
-# ---------- Общие правила компиляции ----------
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.cpp
+$(CREATOR_TARGET): $(CREATOR_OBJS)
+	$(CXX) $(CXXFLAGS) $(CREATOR_OBJS) -o $@ $(LIBS)
+
+$(BUILD_DIR)/%.o: %.cpp
+	@mkdir -p $(dir $@)
 	$(CXX) $(CXXFLAGS) -c $< -o $@
 
 ifeq ($(USE_CUDA),1)
-$(SRC_DIR)/%.o: $(SRC_DIR)/%.cu
+$(BUILD_DIR)/%.o: %.cu
+	@mkdir -p $(dir $@)
 	$(NVCC) $(NVCCFLAGS) -c $< -o $@
 endif
 
+-include $(DEPS)
+
 clean:
-	rm -f $(SRC_DIR)/*.o $(TARGET) $(REPLAY_TARGET)
+	rm -rf $(BUILD_DIR)
+	rm -f $(TARGET) $(REPLAY_TARGET) $(CREATOR_TARGET)
 
 run: all
 	./$(TARGET)
-
-.PHONY: all clean run $(REPLAY_TARGET)
