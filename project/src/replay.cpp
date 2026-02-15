@@ -43,70 +43,6 @@ char title[256];
 
 std::vector<Object> objs;
 
-
-const char* vertexShaderSource = R"glsl(
-#version 330 core
-layout(location=0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-}
-)glsl";
-
-const char* fragmentShaderSource = R"glsl(
-#version 330 core
-out vec4 FragColor;
-uniform vec4 objectColor;
-void main() {
-    FragColor = objectColor;
-}
-)glsl";
-
-// Инициализируем контекст openGL
-GLFWwindow* StartGLU() {
-
-    if (!glfwInit()) {
-        std::cout << "Failed to initialize GLFW\n";
-        return nullptr;
-    }
-
-    // получаем параметры монитора 
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor(); 
-    if (monitor == NULL) {
-        std::cerr << "Failed to create GLFW window";
-        return nullptr; 
-    }
-
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    if (mode == NULL) {
-        std::cerr << "Failed to create GLFW window";
-        return nullptr; 
-    }
-
-    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "3D_TEST", nullptr, nullptr);
-    if (!window) {
-        std::cerr << "Failed to create GLFW window.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-    glfwMakeContextCurrent(window);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, mode->width, mode->height);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    return window;
-}
-
 struct InitRecord {
     glm::dvec3 position;
     double     mass;
@@ -200,12 +136,14 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    GLFWwindow* window = StartGLU();
+    bool fullscreen = false;
+    bool maximized = true;
+    GLFWwindow* window = InitWindow(1280, 720, "3D_TEST", fullscreen, maximized);
     if (!window) return 1;
 
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
-    Renderer renderer(width, height, vertexShaderSource, fragmentShaderSource);
+    Renderer renderer(width, height);
     renderer.setProjection(65.0f, (float)width/height, 0.1f, 100000.0f);
 
     cameraPos   = glm::vec3(0.0f, 50.0f, 250.0f);

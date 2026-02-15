@@ -1,14 +1,17 @@
 #pragma once
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <GLFW/glfw3.h>
 #include <vector>
 #include "object.hpp"
 
 enum class RenderMode { Sphere, Points, Cubes };
 
+GLFWwindow* InitWindow(int width, int height, const char* title, bool fullscreen, bool maximized);
+
 class Renderer {
 public:
-    Renderer(int w, int h, const char* vs, const char* fs);
+    Renderer(int w, int h);
     ~Renderer();
 
     void setProjection(float fov_deg, float aspect, float znear, float zfar);

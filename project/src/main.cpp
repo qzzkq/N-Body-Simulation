@@ -8,7 +8,6 @@
 #include <optional>
 #include <cmath>
 #include <algorithm>
-#include <random>
 #include <filesystem>
 #include "object.hpp"
 #include "renderer.hpp"
@@ -91,8 +90,9 @@ int main() {
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
 #endif
-
-    GLFWwindow* window = StartGLU();
+    bool fullscreen = false;
+    bool maximized = true;
+    GLFWwindow* window = InitWindow(1280, 720, "3D_TEST", fullscreen, maximized);
     if (!window) {
         std::cerr << "Window or OpenGL context creation failed.\n";
         return -1;
@@ -101,7 +101,7 @@ int main() {
     int width, height;
     glfwGetFramebufferSize(window, &width, &height);
 
-    Renderer renderer(width, height, vertexShaderSource, fragmentShaderSource);
+    Renderer renderer(width, height);
     renderer.setProjection(65.0f, (float) width/ (float) height, 8.3f, 100000.0f);
     using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause, int iterations);
     Handler simulationStep = nullptr;
@@ -209,7 +209,6 @@ if (!loaded) {
         std::cout << "Ваш выбор: ";
         std::cin >> choice;
         
-        // Корректируем индекс (пользователь вводит с 1, мы храним с 0)
         if (choice > 0 && choice <= scenNames.size()) {
             scenarioManager->runScenario(choice - 1, objs, params);
         } else {
