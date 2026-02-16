@@ -4,34 +4,14 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <cmath>
 
-Control::Control(GLFWwindow* window,
-                 std::vector<Object>& objs,
-                 glm::vec3& cameraPos,
-                 glm::vec3& cameraFront,
-                 glm::vec3& cameraUp,
-                 float& deltaTime,
-                 float& timeScale,
-                 bool& pause,
-                 bool& running,
-                 float& yaw,
-                 float& pitch,
-                 float& lastX,
-                 float& lastY,
-                 float& initMass)
+Control::Control(GLFWwindow* window, 
+                std::vector<Object>& objs, 
+                Camera& cam, 
+                SimState& state)
     : window_(window),
       objs_(objs),
-      cameraPos_(cameraPos),
-      cameraFront_(cameraFront),
-      cameraUp_(cameraUp),
-      deltaTime_(deltaTime),
-      timeScale_(timeScale),
-      pause_(pause),
-      running_(running),
-      yaw_(yaw),
-      pitch_(pitch),
-      lastX_(lastX),
-      lastY_(lastY),
-      initMass_(initMass)
+      camera_(cam), 
+      state_(state) 
 {}
 
 void Control::attach() {
@@ -57,30 +37,30 @@ void Control::attach() {
 }
 
 void Control::onKey(int key, int /*scancode*/, int action, int mods) {
-    float cameraSpeed = 1000.0f * deltaTime_;
+    float cameraSpeed = 1000.0f * state_.deltaTime;
     bool shiftPressed = (mods & GLFW_MOD_SHIFT) != 0;
 
     // Камера WASD + Space/Shift
-    if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) cameraPos_ += cameraSpeed * cameraFront_;
-    if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) cameraPos_ -= cameraSpeed * cameraFront_;
-    if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) cameraPos_ -= cameraSpeed * glm::normalize(glm::cross(cameraFront_, cameraUp_));
-    if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) cameraPos_ += cameraSpeed * glm::normalize(glm::cross(cameraFront_, cameraUp_));
-    if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS)      cameraPos_ += cameraSpeed * cameraUp_;
-    if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) cameraPos_ -= cameraSpeed * cameraUp_;
+    if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) camera_.pos += cameraSpeed * camera_.front;
+    if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.front;
+    if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) camera_.pos -= cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
+    if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) camera_.pos += cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
+    if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS)      camera_.pos += cameraSpeed * camera_.up;
+    if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.up;
 
     // Ускорение/замедление времени
-    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) timeScale_ = std::min(timeScale_ * 1.1f, 100000.0f);
-    if (glfwGetKey(window_, GLFW_KEY_MINUS)   == GLFW_PRESS) timeScale_ = std::max(timeScale_ / 1.1f, 0.05f);
+    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) state_.timeScale = std::min(state_.timeScale * 1.1f, 100000.0f);
+    if (glfwGetKey(window_, GLFW_KEY_MINUS)   == GLFW_PRESS) state_.timeScale = std::max(state_.timeScale / 1.1f, 0.05f);
     
     // Пауза на K
-    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_PRESS)   pause_ = true;
-    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_RELEASE) pause_ = false;
+    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_PRESS)   state_.pause = true;
+    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_RELEASE) state_.pause = false;
 
     // Выход на Q
     if (glfwGetKey(window_, GLFW_KEY_Q) == GLFW_PRESS) {
         glfwTerminate();
         glfwSetWindowShouldClose(window_, GLFW_TRUE);
-        running_ = false;
+        state_.running = false;
     }
 
     //регулировка размера окна 
@@ -112,29 +92,29 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
 }
 
 void Control::onScroll(double /*xoffset*/, double yoffset) {
-    float cameraSpeed = 5000.0f * deltaTime_;
-    if (yoffset > 0)      cameraPos_ += cameraSpeed * cameraFront_;
-    else if (yoffset < 0) cameraPos_ -= cameraSpeed * cameraFront_;
+    float cameraSpeed = 5000.0f * state_.deltaTime;
+    if (yoffset > 0)      camera_.pos += cameraSpeed *  camera_.front;
+    else if (yoffset < 0) camera_.pos -= cameraSpeed *  camera_.front;
 }
 
 void Control::onCursorPos(double xpos, double ypos) {
-    float xoffset = static_cast<float>(xpos - lastX_);
-    float yoffset = static_cast<float>(lastY_ - ypos);
-    lastX_ = static_cast<float>(xpos);
-    lastY_ = static_cast<float>(ypos);
+    float xoffset = static_cast<float>(xpos - camera_.lastX);
+    float yoffset = static_cast<float>(camera_.lastY - ypos);
+    camera_.lastX = static_cast<float>(xpos);
+    camera_.lastY = static_cast<float>(ypos);
 
     float sensitivity = 0.1f;
     xoffset *= sensitivity;
     yoffset *= sensitivity;
 
-    yaw_   += xoffset;
-    pitch_ += yoffset;
-    if (pitch_ > 89.0f)  pitch_ = 89.0f;
-    if (pitch_ < -89.0f) pitch_ = -89.0f;
+    camera_.yaw   += xoffset;
+    camera_.pitch += yoffset;
+    if (camera_.pitch > 89.0f)  camera_.pitch = 89.0f;
+    if (camera_.pitch < -89.0f) camera_.pitch = -89.0f;
 
     glm::vec3 front;
-    front.x = cos(glm::radians(yaw_)) * cos(glm::radians(pitch_));
-    front.y = sin(glm::radians(pitch_));
-    front.z = sin(glm::radians(yaw_)) * cos(glm::radians(pitch_));
-    cameraFront_ = glm::normalize(front);
+    front.x = cos(glm::radians(camera_.yaw)) * cos(glm::radians(camera_.pitch));
+    front.y = sin(glm::radians(camera_.pitch));
+    front.z = sin(glm::radians(camera_.yaw)) * cos(glm::radians(camera_.pitch));
+    camera_.front = glm::normalize(front);
 }

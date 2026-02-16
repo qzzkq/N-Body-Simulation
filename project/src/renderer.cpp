@@ -126,12 +126,10 @@ void Renderer::setProjection(float fov_deg,
     glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(P));
 }
 
-void Renderer::updateView(const glm::vec3& pos,
-                          const glm::vec3& front,
-                          const glm::vec3& up)
+void Renderer::updateView(const Camera& camera)
 {
     glUseProgram(program_);
-    glm::mat4 V = glm::lookAt(pos, pos + front, up);
+    glm::mat4 V = camera.getViewMatrix();
     glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(V));
 }
 

@@ -23,21 +23,9 @@
 #include "renderer.hpp"
 #include "control.hpp"
 #include "physics.hpp"
+#include "state.hpp"
+#include "camera.hpp"
 using namespace H5;
-
-bool running = true;
-bool pause   = false;
-
-glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f, 1.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
-
-float lastX = 400.0f, lastY = 300.0f;
-float yaw   = -90.0f;
-float pitch = 0.0f;
-
-float dt        = 0.0f;
-float timeScale = 1.0f;   // скорость воспроизведения
 
 char title[256];
 
@@ -65,6 +53,10 @@ static ArrayType GetPosType() {
 }
 
 int main(int argc, char** argv) {
+
+    Camera cam; 
+    SimState state; 
+
 #ifdef _WIN32
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
@@ -146,15 +138,13 @@ int main(int argc, char** argv) {
     Renderer renderer(width, height);
     renderer.setProjection(65.0f, (float)width/height, 0.1f, 100000.0f);
 
-    cameraPos   = glm::vec3(0.0f, 50.0f, 250.0f);
-    cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+    cam.pos = glm::vec3(0.0f, 50.0f, 250.0f);
+    cam.front = glm::vec3(0.0f, 0.0f, -1.0f);
+    cam.up    = glm::vec3(0.0f, 1.0f,  0.0f);
 
     renderer.setRenderMode(RenderMode::Sphere);
-    
-    float initMass = 1.0f;
 
-    Control control(window, objs, cameraPos, cameraFront, cameraUp, dt, timeScale, pause, running, yaw, pitch, lastX, lastY, initMass);
+    Control control(window, objs, cam, state);
     control.attach();
 
     double playbackTime = 0.0;
@@ -168,14 +158,14 @@ int main(int argc, char** argv) {
     
     std::vector<glm::dvec3> posBuffer(numBodies);
 
-    while (!glfwWindowShouldClose(window) && running) {
+    while (!glfwWindowShouldClose(window) && state.running) {
         double now = glfwGetTime();
         double realDt = now - lastRealTime;
         lastRealTime = now;
-        dt = (float)realDt;
+        state.deltaTime = (float)realDt;
 
-        if (!pause) {
-            playbackTime += realDt * timeScale;
+        if (!state.pause) {
+            playbackTime += realDt * state.timeScale;
         }
 
         if (playbackTime > maxTime) playbackTime = 0.0;
@@ -204,12 +194,12 @@ int main(int argc, char** argv) {
         }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        renderer.updateView(cameraPos, cameraFront, cameraUp);
+        renderer.updateView(cam);
         renderer.drawObjects(objs);
 
         std::snprintf(title, sizeof(title),
                       "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
-                      playbackTime, maxTime, currentFrameIdx, timeScale);
+                      playbackTime, maxTime, currentFrameIdx, state.timeScale);
         glfwSetWindowTitle(window, title);
 
         glfwSwapBuffers(window);

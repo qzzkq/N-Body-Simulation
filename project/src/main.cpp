@@ -20,6 +20,8 @@
 #include "brut_force.hpp"
 #include "physics.hpp"
 #include "generators.hpp"
+#include "camera.hpp"
+#include "state.hpp"
 
 #ifdef USE_CUDA
 #include "barnes_hut_cuda.cuh"
@@ -33,52 +35,17 @@
 #include <windows.h>
 #endif
 
-
-bool running = true;
-bool pause   = false;
-
-glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f, 1.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
-
 float lastX = 400.0f, lastY = 300.0f;
 float yaw   = -90.0f;
 float pitch = 0.0f;
 
-float dt = 0.0f;
-float lastFrame = 0.0f;
-
 double gSimTime = 0.0;
-float timeScale = 1.0f; // переменная для ускорения/замедления времени
 float fixedDt = 1.0f/60; // шаг времени;
-float grid_size2  = 400.0f;
-int   vert_count2 = 10;
 const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
 std::vector<Object> objs = {};
-
-// Шейдеры
-const char* vertexShaderSource = R"glsl(
-#version 330 core
-layout(location=0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-}
-)glsl";
-
-const char* fragmentShaderSource = R"glsl(
-#version 330 core
-out vec4 FragColor;
-uniform vec4 objectColor;
-void main() {
-    FragColor = objectColor;
-}
-)glsl";
 
 
 GLFWwindow* StartGLU();
@@ -105,7 +72,6 @@ int main() {
     renderer.setProjection(65.0f, (float) width/ (float) height, 8.3f, 100000.0f);
     using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause, int iterations);
     Handler simulationStep = nullptr;
-    cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
     RenderMode renderMode = RenderMode::Sphere;
     auto scenarioManager = CreateDefaultManager();
@@ -227,12 +193,12 @@ if (!loaded) {
 
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
+    Camera cam;
+    SimState state; 
+
     // Управление
     Control control(window, objs,
-                    cameraPos, cameraFront, cameraUp,
-                    dt, timeScale, pause, running,
-                    yaw, pitch, lastX, lastY,
-                    initMass);
+                    cam, state);
     control.attach();
     int counter = 0;
     double lastTime = glfwGetTime();
@@ -245,34 +211,34 @@ if (!loaded) {
     int stepCounter = 0;
 
     if (isRealTime) {
-        while (!glfwWindowShouldClose(window) && running) {
+        while (!glfwWindowShouldClose(window) && state.running) {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
             
 
-            dt = frameRealDt;
+            state.deltaTime = frameRealDt;
             lastTime = now;
-            frameRealDt *= timeScale;
+            frameRealDt *= state.timeScale;
             accumulator += frameRealDt;
 
             int substeps = 0;
 
             while (accumulator >= fixedDt) {
-                simulationStep(objs, fixedDt, pause, 1);
+                simulationStep(objs, fixedDt, state.pause, 1);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
             }
 
             glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderer.updateView(cameraPos, cameraFront, cameraUp);
+            renderer.updateView(cam);
             renderer.drawObjects(objs);
 
-            double dtForFps = frameRealDt / std::max(1.0f, timeScale);
+            double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
             std::snprintf(title, sizeof(title),
                   "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f",
-                  timeScale, fps, objs.size(), gSimTime);
+                  state.timeScale, fps, objs.size(), gSimTime);
             glfwSetWindowTitle(window, title);
 
             glfwSwapBuffers(window);
@@ -288,7 +254,7 @@ if (!loaded) {
         glfwSwapInterval(0);
         std::cout << "Начинаем расчет..." << std::endl;
 
-        while (!glfwWindowShouldClose(window) && running && gSimTime < targetTime) {
+        while (!glfwWindowShouldClose(window) && state.running && gSimTime < targetTime) {
             simulationStep(objs, fixedDt, false, FIXED_STEPS);
             gSimTime += fixedDt * FIXED_STEPS;
             stepCounter += FIXED_STEPS;
@@ -298,7 +264,7 @@ if (!loaded) {
                 glfwPollEvents();
 
                 glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                renderer.updateView(cameraPos, cameraFront, cameraUp);
+                renderer.updateView(cam);
                 
                 double progress = (gSimTime / targetTime) * 100.0;
                 std::snprintf(title, sizeof(title),

@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include "object.hpp"
+#include "camera.hpp" 
 
 enum class RenderMode { Sphere, Points, Cubes };
 
@@ -15,7 +16,7 @@ public:
     ~Renderer();
 
     void setProjection(float fov_deg, float aspect, float znear, float zfar);
-    void updateView(const glm::vec3& pos, const glm::vec3& front, const glm::vec3& up);
+    void updateView(const Camera& camera);
     void drawObjects(const std::vector<Object>& objs) const;
     
     void setRenderMode(RenderMode mode) { mode_ = mode; }
