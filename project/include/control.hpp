@@ -3,24 +3,16 @@ struct GLFWwindow;
 #include <glm/glm.hpp>
 #include <vector>
 #include "object.hpp"
+#include "camera.hpp"
+#include "state.hpp"
 
 // Управляет вводом, камерой и созданием объектов.
 class Control {
 public:
-    Control(GLFWwindow* window,
-            std::vector<Object>& objs,
-            glm::vec3& cameraPos,
-            glm::vec3& cameraFront,
-            glm::vec3& cameraUp,
-            float& deltaTime,
-            float& timeScale,
-            bool& pause,
-            bool& running,
-            float& yaw,
-            float& pitch,
-            float& lastX,
-            float& lastY,
-            float& initMass);
+    Control(GLFWwindow* window, 
+            std::vector<Object>& objs, 
+            Camera& cam, 
+            SimState& state);
 
     void attach();
 
@@ -38,16 +30,6 @@ private:
     // Ссылки на состояние
     GLFWwindow* window_;
     std::vector<Object>& objs_;
-    glm::vec3& cameraPos_;
-    glm::vec3& cameraFront_;
-    glm::vec3& cameraUp_;
-    float& deltaTime_;
-    float& timeScale_;
-    bool& pause_;
-    bool& running_;
-    float& yaw_;
-    float& pitch_;
-    float& lastX_;
-    float& lastY_;
-    float& initMass_;
+    Camera& camera_;
+    SimState& state_;
 };
