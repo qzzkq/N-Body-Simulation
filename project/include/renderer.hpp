@@ -8,26 +8,41 @@
 
 enum class RenderMode { Sphere, Points, Cubes };
 
-GLFWwindow* InitWindow(int width, int height, const char* title, bool fullscreen, bool maximized);
-
 class Renderer {
 public:
-    Renderer(int w, int h);
+    Renderer();
     ~Renderer();
 
-    void setProjection(float fov_deg, float aspect, float znear, float zfar);
+    bool init(int width,  int height, const char* title, bool fullscreen, bool maximized); 
+
+    void setProjection(float fov_deg, float znear, float zfar);
     void updateView(const Camera& camera);
     void drawObjects(const std::vector<Object>& objs) const;
     
     void setRenderMode(RenderMode mode) { mode_ = mode; }
 
+    GLFWwindow* getWindow() const { return window_; }
+    
+    void renderFrame(const std::vector<Object>& objs, const Camera& cam);
+    
+    void resizeWindow(int w, int h);
+
 private:
     GLuint compileProgram(const char* vs, const char* fs);
     
+    GLFWwindow* window_ = nullptr; 
+
     // Инициализаторы геометрии
     void initSphereGeometry();
     void initCubeGeometry();  
     void initPointGeometry(); 
+
+    bool initWindow(int width, 
+        int height, 
+        const char* title, 
+        bool fullscreen, 
+        bool maximized);
+    void initProgram(); 
 
     GLuint program_;
     GLint uModel_, uView_, uProj_, uColor_;
@@ -46,4 +61,6 @@ private:
     // VAO и VBO для точки 
     GLuint pointVAO_ = 0;
     GLuint pointVBO_ = 0;
+    
+    bool successInit_ = false; 
 };

@@ -130,13 +130,12 @@ int main(int argc, char** argv) {
 
     bool fullscreen = false;
     bool maximized = true;
-    GLFWwindow* window = InitWindow(1280, 720, "3D_TEST", fullscreen, maximized);
-    if (!window) return 1;
+    Renderer renderer;
+    if (!renderer.init(1280, 720, "N-Body simulation", fullscreen, maximized)) {
+        return 1;
+    }
 
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    Renderer renderer(width, height);
-    renderer.setProjection(65.0f, (float)width/height, 0.1f, 100000.0f);
+    renderer.setProjection(65.0f, 0.1f, 100000.0f);
 
     cam.pos = glm::vec3(0.0f, 50.0f, 250.0f);
     cam.front = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -144,7 +143,7 @@ int main(int argc, char** argv) {
 
     renderer.setRenderMode(RenderMode::Sphere);
 
-    Control control(window, objs, cam, state);
+    Control control(renderer.getWindow(), objs, cam, state);
     control.attach();
 
     double playbackTime = 0.0;
@@ -158,7 +157,7 @@ int main(int argc, char** argv) {
     
     std::vector<glm::dvec3> posBuffer(numBodies);
 
-    while (!glfwWindowShouldClose(window) && state.running) {
+    while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
         double now = glfwGetTime();
         double realDt = now - lastRealTime;
         lastRealTime = now;
@@ -193,16 +192,12 @@ int main(int argc, char** argv) {
             lastReadFrameIdx = currentFrameIdx;
         }
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        renderer.updateView(cam);
-        renderer.drawObjects(objs);
+        renderer.renderFrame(objs, cam); 
 
         std::snprintf(title, sizeof(title),
                       "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
                       playbackTime, maxTime, currentFrameIdx, state.timeScale);
-        glfwSetWindowTitle(window, title);
-
-        glfwSwapBuffers(window);
+        glfwSetWindowTitle(renderer.getWindow(), title);
         glfwPollEvents();
     }
 

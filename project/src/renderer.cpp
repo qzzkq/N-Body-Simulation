@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cmath>
 
-
 static const char* VERTEX_SHADER_SOURCE = R"glsl(
 #version 330 core
 layout(location=0) in vec3 aPos;
@@ -26,64 +25,6 @@ void main() {
 }
 )glsl";
 
-GLFWwindow* InitWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW\n";
-        return nullptr;
-    }
-
-    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-
-    if (mode == nullptr) {
-        std::cerr << "Failed to get video mode\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    GLFWmonitor* monitorForWindow = nullptr; 
-
-    if (fullscreen) {
-        monitorForWindow = primaryMonitor;
-        width = mode->width;   
-        height = mode->height;
-        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-    } 
-    else if (maximized) {
-        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-        
-        width = mode->width;
-        height = mode->height;
-    }
-
-    GLFWwindow* window = glfwCreateWindow(width, height, title, monitorForWindow, nullptr);
-    
-    if (!window) {
-        std::cerr << "Failed to create GLFW window.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-    glfwMakeContextCurrent(window);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    glEnable(GL_DEPTH_TEST);
-
-    int bufferWidth, bufferHeight;
-    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
-    glViewport(0, 0, bufferWidth, bufferHeight);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    return window;
-}
-
 // перевод сферических координат в декартовы 
 static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
     return glm::vec3(
@@ -95,32 +36,40 @@ static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
 
 //==PUBLIC BLOCK==
 
-Renderer::Renderer(int /*w*/, int /*h*/) {
-    program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-    glUseProgram(program_);
-    
-    uModel_ = glGetUniformLocation(program_, "model");
-    uView_  = glGetUniformLocation(program_, "view");
-    uProj_  = glGetUniformLocation(program_, "projection");
-    uColor_ = glGetUniformLocation(program_, "objectColor");
-
-    initSphereGeometry();
-    initCubeGeometry();
-    initPointGeometry();
+Renderer::Renderer() {
 }
 
 Renderer::~Renderer() {
-    glDeleteVertexArrays(1, &sphereVAO_); glDeleteBuffers(1, &sphereVBO_);
-    glDeleteVertexArrays(1, &cubeVAO_);   glDeleteBuffers(1, &cubeVBO_);
-    glDeleteVertexArrays(1, &pointVAO_);  glDeleteBuffers(1, &pointVBO_);
-    glDeleteProgram(program_);
+    if (successInit_) {
+        glDeleteVertexArrays(1, &sphereVAO_); glDeleteBuffers(1, &sphereVBO_);
+        glDeleteVertexArrays(1, &cubeVAO_);   glDeleteBuffers(1, &cubeVBO_);
+        glDeleteVertexArrays(1, &pointVAO_);  glDeleteBuffers(1, &pointVBO_);
+        glDeleteProgram(program_);
+    }
+}
+
+bool Renderer::init(int width,  int height, const char* title, bool fullscreen, bool maximized) {
+    if (!initWindow(width, height, title, fullscreen, maximized)) {
+        successInit_ = false; 
+        return false; 
+    }
+
+    initProgram();
+
+    initCubeGeometry();
+    initPointGeometry();
+    initSphereGeometry();
+    successInit_ = true;  
+    return true; 
 }
 
 void Renderer::setProjection(float fov_deg,
-                             float aspect,
                              float znear,
                              float zfar)
 {
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    float aspect = (float) width / height; 
     glUseProgram(program_);
     glm::mat4 P = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
     glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(P));
@@ -177,6 +126,25 @@ void Renderer::drawObjects(const std::vector<Object>& objs) const {
         }
         glBindVertexArray(0);
     }
+}
+
+void Renderer::resizeWindow(int w, int h) {
+    glfwSetWindowSize(window_, w, h);
+    int frW, frH;
+    glfwGetFramebufferSize(window_, &frW, &frH);
+    glViewport(0, 0, frW, frH);
+}
+
+void Renderer::renderFrame(const std::vector<Object>& objs, const Camera& cam) {
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    updateView(cam);
+    
+    // Позже мы добавим сюда drawTrails(objs);
+    drawObjects(objs);
+    
+    glfwSwapBuffers(window_);
 }
 
 //==PRIVATE BLOCK==
@@ -295,4 +263,73 @@ void Renderer::initSphereGeometry() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
+}
+
+bool Renderer::initWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW\n";
+        return false;
+    }
+
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+    if (mode == nullptr) {
+        std::cerr << "Failed to get video mode\n";
+        glfwTerminate();
+        return false;
+    }
+
+    GLFWmonitor* monitorForWindow = nullptr; 
+
+    if (fullscreen) {
+        monitorForWindow = primaryMonitor;
+        width = mode->width;   
+        height = mode->height;
+        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+    } 
+    else if (maximized) {
+        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+        
+        width = mode->width;
+        height = mode->height;
+    }
+
+    GLFWwindow* window = glfwCreateWindow(width, height, title, monitorForWindow, nullptr);
+    
+    if (!window) {
+        std::cerr << "Failed to create GLFW window.\n";
+        glfwTerminate();
+        return false;
+    }
+    glfwMakeContextCurrent(window);
+
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Failed to initialize GLEW.\n";
+        glfwTerminate();
+        return false;
+    }
+
+    glEnable(GL_DEPTH_TEST);
+
+    int bufferWidth, bufferHeight;
+    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
+    glViewport(0, 0, bufferWidth, bufferHeight);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    window_ = window; 
+    return true;
+}
+
+void Renderer::initProgram() {
+    program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    glUseProgram(program_);
+    
+    uModel_ = glGetUniformLocation(program_, "model");
+    uView_  = glGetUniformLocation(program_, "view");
+    uProj_  = glGetUniformLocation(program_, "projection");
+    uColor_ = glGetUniformLocation(program_, "objectColor");
 }
