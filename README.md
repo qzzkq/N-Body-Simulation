@@ -148,4 +148,4 @@ project/
 ```
 ## Документация
 
-Материалы проекта лежат в docs/
+[Материалы проекта лежат по ссылке на Wiki-страничке](https://github.com/qzzkq/N-Body-Simulation/wiki/Documents)
