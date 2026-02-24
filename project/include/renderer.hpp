@@ -27,6 +27,8 @@ public:
     
     void resizeWindow(int w, int h);
 
+    void drawTrails(const std::vector<Object>& objs) const; 
+
 private:
     GLuint compileProgram(const char* vs, const char* fs);
     
@@ -35,7 +37,8 @@ private:
     // Инициализаторы геометрии
     void initSphereGeometry();
     void initCubeGeometry();  
-    void initPointGeometry(); 
+    void initPointGeometry();
+    void initTrailVAO_VBO(); 
 
     bool initWindow(int width, 
         int height, 
@@ -47,6 +50,8 @@ private:
     GLuint program_;
     GLint uModel_, uView_, uProj_, uColor_;
     
+    GLuint trailProgram_;
+
     RenderMode mode_ = RenderMode::Cubes; 
 
     // VAO и VBO для сферы 
@@ -61,6 +66,13 @@ private:
     // VAO и VBO для точки 
     GLuint pointVAO_ = 0;
     GLuint pointVBO_ = 0;
+
+    //VAO и VBO для трэйлов
+    GLuint trailVAO_ = 0;
+    GLuint trailVBO_ = 0; 
+
+    glm::mat4 viewMatrix_; 
+    glm::mat4 projectionMatrix_; 
     
     bool successInit_ = false; 
 };

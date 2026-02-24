@@ -218,12 +218,14 @@ if (!loaded) {
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
+                for(auto& obj : objs) obj.updateTrail();
             }
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderer.updateView(cam);
-            renderer.drawObjects(objs);
+            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            //renderer.updateView(cam);
+            //renderer.drawObjects(objs);
 
+            renderer.renderFrame(objs, cam);
             double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
             std::snprintf(title, sizeof(title),
@@ -231,7 +233,7 @@ if (!loaded) {
                   state.timeScale, fps, objs.size(), gSimTime);
             glfwSetWindowTitle(renderer.getWindow(), title);
 
-            glfwSwapBuffers(renderer.getWindow());
+            //glfwSwapBuffers(renderer.getWindow());
             glfwPollEvents();
         }
 

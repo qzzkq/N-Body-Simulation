@@ -174,6 +174,13 @@ int main(int argc, char** argv) {
         if (currentFrameIdx >= numFrames) currentFrameIdx = numFrames - 1;
 
         if (currentFrameIdx != lastReadFrameIdx) {
+
+            if (currentFrameIdx < lastReadFrameIdx && lastReadFrameIdx != 99999999999) {
+                for (auto& obj : objs) {
+                    obj.trail.clear(); 
+                }
+            }
+
             hsize_t offset[2] = { static_cast<hsize_t>(currentFrameIdx), 0 };
             hsize_t count[2]  = { 1, static_cast<hsize_t>(numBodies) };
             
@@ -189,6 +196,8 @@ int main(int argc, char** argv) {
                 objs[i].position = posBuffer[i];
             }
 
+            for(auto& obj : objs) obj.updateTrail(); 
+
             lastReadFrameIdx = currentFrameIdx;
         }
 
@@ -203,4 +212,5 @@ int main(int argc, char** argv) {
 
     glfwTerminate();
     return 0;
+    
 }

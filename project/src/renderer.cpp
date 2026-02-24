@@ -25,6 +25,25 @@ void main() {
 }
 )glsl";
 
+static const char* TRAIL_VS = R"glsl(
+#version 330 core
+layout(location=0) in vec3 aPos;
+uniform mat4 view;
+uniform mat4 projection;
+void main() {
+    gl_Position = projection * view * vec4(aPos, 1.0);
+}
+)glsl";
+
+static const char* TRAIL_FS = R"glsl(
+#version 330 core
+out vec4 FragColor;
+uniform vec4 color;
+void main() {
+    FragColor = color;
+}
+)glsl";
+
 // перевод сферических координат в декартовы 
 static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
     return glm::vec3(
@@ -59,6 +78,7 @@ bool Renderer::init(int width,  int height, const char* title, bool fullscreen, 
     initCubeGeometry();
     initPointGeometry();
     initSphereGeometry();
+    initTrailVAO_VBO(); 
     successInit_ = true;  
     return true; 
 }
@@ -71,15 +91,15 @@ void Renderer::setProjection(float fov_deg,
     glfwGetFramebufferSize(window_, &width, &height);
     float aspect = (float) width / height; 
     glUseProgram(program_);
-    glm::mat4 P = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
-    glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(P));
+    projectionMatrix_ = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
+    glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
 }
 
 void Renderer::updateView(const Camera& camera)
 {
+    viewMatrix_ = camera.getViewMatrix(); 
     glUseProgram(program_);
-    glm::mat4 V = camera.getViewMatrix();
-    glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(V));
+    glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(viewMatrix_));
 }
 
 void Renderer::drawObjects(const std::vector<Object>& objs) const {
@@ -141,10 +161,39 @@ void Renderer::renderFrame(const std::vector<Object>& objs, const Camera& cam) {
     
     updateView(cam);
     
-    // Позже мы добавим сюда drawTrails(objs);
+    drawTrails(objs);
     drawObjects(objs);
     
     glfwSwapBuffers(window_);
+}
+
+void Renderer::drawTrails(const std::vector<Object>& objs) const {
+    glUseProgram(trailProgram_);
+    
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
+
+    glBindVertexArray(trailVAO_);
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO_);
+
+    for (const auto& obj : objs) {
+        if (obj.trail.size() < 2) continue;
+
+        std::vector<glm::vec3> points(obj.trail.begin(), obj.trail.end());
+        points.push_back(obj.position); 
+
+        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
+        
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glm::vec4 trailColor = obj.color * 0.7f;
+        trailColor.a = 0.5f; 
+        glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
+
+        glDrawArrays(GL_LINE_STRIP, 0, points.size());
+    }
+    glBindVertexArray(0);
 }
 
 //==PRIVATE BLOCK==
@@ -265,6 +314,11 @@ void Renderer::initSphereGeometry() {
     glBindVertexArray(0);
 }
 
+void Renderer::initTrailVAO_VBO() {
+    glGenVertexArrays(1, &trailVAO_);
+    glGenBuffers(1, &trailVBO_);
+}
+
 bool Renderer::initWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
     if (!glfwInit()) {
         std::cerr << "Failed to initialize GLFW\n";
@@ -326,6 +380,7 @@ bool Renderer::initWindow(int width, int height, const char* title, bool fullscr
 
 void Renderer::initProgram() {
     program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    trailProgram_ = compileProgram(TRAIL_VS, TRAIL_FS);
     glUseProgram(program_);
     
     uModel_ = glGetUniformLocation(program_, "model");
