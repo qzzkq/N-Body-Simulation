@@ -20,6 +20,8 @@
 #include "brut_force.hpp"
 #include "physics.hpp"
 #include "generators.hpp"
+#include "camera.hpp"
+#include "state.hpp"
 
 #ifdef USE_CUDA
 #include "barnes_hut_cuda.cuh"
@@ -33,56 +35,13 @@
 #include <windows.h>
 #endif
 
-
-bool running = true;
-bool pause   = false;
-
-glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f, 1.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f, 0.0f);
-
-float lastX = 400.0f, lastY = 300.0f;
-float yaw   = -90.0f;
-float pitch = 0.0f;
-
-float dt = 0.0f;
-float lastFrame = 0.0f;
-
 double gSimTime = 0.0;
-float timeScale = 1.0f; // переменная для ускорения/замедления времени
 float fixedDt = 1.0f/60; // шаг времени;
-float grid_size2  = 400.0f;
-int   vert_count2 = 10;
 const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
 std::vector<Object> objs = {};
-
-// Шейдеры
-const char* vertexShaderSource = R"glsl(
-#version 330 core
-layout(location=0) in vec3 aPos;
-uniform mat4 model;
-uniform mat4 view;
-uniform mat4 projection;
-void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
-}
-)glsl";
-
-const char* fragmentShaderSource = R"glsl(
-#version 330 core
-out vec4 FragColor;
-uniform vec4 objectColor;
-void main() {
-    FragColor = objectColor;
-}
-)glsl";
-
-
-GLFWwindow* StartGLU();
-
 
 int main() {
 
@@ -92,20 +51,17 @@ int main() {
 #endif
     bool fullscreen = false;
     bool maximized = true;
-    GLFWwindow* window = InitWindow(1280, 720, "3D_TEST", fullscreen, maximized);
-    if (!window) {
+
+    Renderer renderer; 
+
+    if (!renderer.init(1280, 720, "N-Body simulation", fullscreen, maximized)) {
         std::cerr << "Window or OpenGL context creation failed.\n";
         return -1;
     }
 
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-
-    Renderer renderer(width, height);
-    renderer.setProjection(65.0f, (float) width/ (float) height, 8.3f, 100000.0f);
+    renderer.setProjection(65.0f, 8.3f, 100000.0f);
     using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause, int iterations);
     Handler simulationStep = nullptr;
-    cameraPos = glm::vec3(0.0f, 50.0f, 250.0f);
 
     RenderMode renderMode = RenderMode::Sphere;
     auto scenarioManager = CreateDefaultManager();
@@ -227,12 +183,12 @@ if (!loaded) {
 
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
+    Camera cam;
+    SimState state; 
+
     // Управление
-    Control control(window, objs,
-                    cameraPos, cameraFront, cameraUp,
-                    dt, timeScale, pause, running,
-                    yaw, pitch, lastX, lastY,
-                    initMass);
+    Control control(renderer.getWindow(), objs,
+                    cam, state);
     control.attach();
     int counter = 0;
     double lastTime = glfwGetTime();
@@ -245,37 +201,39 @@ if (!loaded) {
     int stepCounter = 0;
 
     if (isRealTime) {
-        while (!glfwWindowShouldClose(window) && running) {
+        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
             
 
-            dt = frameRealDt;
+            state.deltaTime = frameRealDt;
             lastTime = now;
-            frameRealDt *= timeScale;
+            frameRealDt *= state.timeScale;
             accumulator += frameRealDt;
 
             int substeps = 0;
 
             while (accumulator >= fixedDt) {
-                simulationStep(objs, fixedDt, pause, 1);
+                simulationStep(objs, fixedDt, state.pause, 1);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
+                for(auto& obj : objs) obj.updateTrail();
             }
 
-            glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            renderer.updateView(cameraPos, cameraFront, cameraUp);
-            renderer.drawObjects(objs);
+            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+            //renderer.updateView(cam);
+            //renderer.drawObjects(objs);
 
-            double dtForFps = frameRealDt / std::max(1.0f, timeScale);
+            renderer.renderFrame(objs, cam);
+            double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
             std::snprintf(title, sizeof(title),
                   "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f",
-                  timeScale, fps, objs.size(), gSimTime);
-            glfwSetWindowTitle(window, title);
+                  state.timeScale, fps, objs.size(), gSimTime);
+            glfwSetWindowTitle(renderer.getWindow(), title);
 
-            glfwSwapBuffers(window);
+            //glfwSwapBuffers(renderer.getWindow());
             glfwPollEvents();
         }
 
@@ -288,7 +246,7 @@ if (!loaded) {
         glfwSwapInterval(0);
         std::cout << "Начинаем расчет..." << std::endl;
 
-        while (!glfwWindowShouldClose(window) && running && gSimTime < targetTime) {
+        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime) {
             simulationStep(objs, fixedDt, false, FIXED_STEPS);
             gSimTime += fixedDt * FIXED_STEPS;
             stepCounter += FIXED_STEPS;
@@ -297,63 +255,15 @@ if (!loaded) {
             if (stepCounter % (FIXED_STEPS * 10) == 0) {
                 glfwPollEvents();
 
-                glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-                renderer.updateView(cameraPos, cameraFront, cameraUp);
-                
+                renderer.renderFrame(objs, cam);
                 double progress = (gSimTime / targetTime) * 100.0;
                 std::snprintf(title, sizeof(title),
                       "BAKING... %.1f%% | Time: %.2f / %.2f | Saved: %zu",
                       progress, gSimTime, targetTime, frameIndex);
-                glfwSetWindowTitle(window, title);
-                glfwSwapBuffers(window);
-                
+                glfwSetWindowTitle(renderer.getWindow(), title);
             }
         }
-
         std::cout << "Расчет завершен за " << (static_cast<int>(time(NULL)) - startTime) << " сек.\n";
     }
     CloseSimulationFile(framesFile, frameIndex);
-}
-
-// Инициализируем контекст openGL
-GLFWwindow* StartGLU() {
-
-    if (!glfwInit()) {
-        std::cout << "Failed to initialize GLFW\n";
-        return nullptr;
-    }
-
-    // получаем параметры монитора 
-    GLFWmonitor* monitor = glfwGetPrimaryMonitor(); 
-    if (monitor == NULL) {
-        std::cerr << "Failed to create GLFW window";
-        return nullptr; 
-    }
-
-    const GLFWvidmode* mode = glfwGetVideoMode(monitor);
-    if (mode == NULL) {
-        std::cerr << "Failed to create GLFW window";
-        return nullptr; 
-    }
-
-    GLFWwindow* window = glfwCreateWindow(mode->width, mode->height, "3D_TEST", nullptr, nullptr);
-    if (!window) {
-        std::cerr << "Failed to create GLFW window.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-    glfwMakeContextCurrent(window);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    glEnable(GL_DEPTH_TEST);
-    glViewport(0, 0, mode->width, mode->height);
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    return window;
 }

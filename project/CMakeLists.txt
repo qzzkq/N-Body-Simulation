@@ -4,7 +4,6 @@ project(NBodySimulation LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Для стандартных путей установки (bin, lib, etc.)
 include(GNUInstallDirs)
 
 # ---------------------------------------------------------
@@ -16,8 +15,12 @@ find_package(glfw3  REQUIRED)
 find_package(glm    REQUIRED)
 find_package(HDF5   REQUIRED COMPONENTS C CXX HL)
 
+if(WIN32)
+    add_definitions(-DGLEW_STATIC)
+endif()
+
 # ---------------------------------------------------------
-# 2. Определение CUDA (Автоматически)
+# 2. Определение CUDA
 # ---------------------------------------------------------
 include(CheckLanguage)
 check_language(CUDA)
@@ -25,33 +28,27 @@ check_language(CUDA)
 if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
-    message(STATUS "CUDA found! GPU acceleration enabled.")
-    
     add_compile_definitions(USE_CUDA)
-    set(CUDA_SOURCES src/barnes_hut_cuda.cu)
+    file(GLOB CUDA_SOURCES "src/*.cu")
 else()
-    message(STATUS "CUDA NOT found. Building CPU-only version.")
     set(CUDA_SOURCES "")
 endif()
 
 # ---------------------------------------------------------
-# 3. Настройка системных библиотек (Linux)
-# ---------------------------------------------------------
-if(UNIX AND NOT WIN32)
-    set(SYSTEM_LIBS X11 Xrandr Xi Xxf86vm Xcursor pthread dl)
-endif()
-
-# ---------------------------------------------------------
-# 4. Сборка ядра (Core Library)
+# 3. Сборка ядра (Core Library)
 # ---------------------------------------------------------
 set(CORE_SRC
     src/object.cpp
     src/renderer.cpp
     src/control.cpp
-    src/data.cpp
     src/bodysystem.cpp
+    src/data.cpp
+    src/physics.cpp
+    src/generators.cpp
     src/barnes_hut.cpp
-    ${CUDA_SOURCES}) 
+    src/brut_force.cpp
+    ${CUDA_SOURCES}
+) 
 
 add_library(Core STATIC ${CORE_SRC})
 
@@ -70,8 +67,12 @@ target_link_libraries(Core PUBLIC
     OpenGL::GL
     GLEW::GLEW
     glfw
-    ${SYSTEM_LIBS}
+    glm::glm
 ) 
+
+if(UNIX AND NOT WIN32)
+    target_link_libraries(Core PUBLIC X11 Xrandr Xi Xxf86vm Xcursor pthread dl)
+endif()
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(Core PUBLIC CUDA::cudart)
@@ -79,35 +80,44 @@ if(CMAKE_CUDA_COMPILER)
 endif()
 
 # ---------------------------------------------------------
-# 5. Исполняемые файлы
+# 4. Исполняемые файлы
 # ---------------------------------------------------------
-
-# Симуляция
 add_executable(Simulate src/main.cpp)
 target_link_libraries(Simulate PRIVATE Core)
 
-# Проигрыватель
 add_executable(Replay src/replay.cpp)
 target_link_libraries(Replay PRIVATE Core)
 
-# Генератор данных
 add_executable(DataCreator src/datacreator.cpp)
 target_link_libraries(DataCreator PRIVATE Core)
 
 # ---------------------------------------------------------
-# 6. Установка (INSTALL)
+# 5. Установка (INSTALL)
 # ---------------------------------------------------------
 
-# 1. Установка бинарных файлов и библиотеки
-install(TARGETS Simulate Replay DataCreator Core
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR} 
-    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+# Устанавливаем EXE в bin/
+install(TARGETS Simulate Replay DataCreator
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
 
-# 2. Установка папки data
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/data")
-    install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR}) 
-else()
-    message(WARNING "Folder 'data' not found in source directory! It won't be installed.")
-endif() 
+# Устанавливаем папку data/ в папку с исполняемыми файлами
+install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+# ---------------------------------------------------------
+# 6. Windows DLL Deployment
+# ---------------------------------------------------------
+if(WIN32)
+    # Копирование DLL при установке (cmake --install)
+    install(FILES $<TARGET_RUNTIME_DLLS:Simulate> DESTINATION ${CMAKE_INSTALL_BINDIR})
+    
+    # Копирование папки data и DLL сразу после сборки (для запуска из папки build)
+    add_custom_command(TARGET Simulate POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/data"
+            "$<TARGET_FILE_DIR:Simulate>/data"
+        COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:Simulate>"
+            $<TARGET_RUNTIME_DLLS:Simulate>
+        COMMENT "Copying data and DLLs to executable directory..."
+        COMMAND_EXPAND_LISTS
+    )
+endif()

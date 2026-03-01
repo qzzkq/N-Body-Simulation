@@ -5,7 +5,6 @@
 #include <iostream>
 #include <cmath>
 
-
 static const char* VERTEX_SHADER_SOURCE = R"glsl(
 #version 330 core
 layout(location=0) in vec3 aPos;
@@ -26,63 +25,24 @@ void main() {
 }
 )glsl";
 
-GLFWwindow* InitWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
-    if (!glfwInit()) {
-        std::cerr << "Failed to initialize GLFW\n";
-        return nullptr;
-    }
-
-    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
-    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
-
-    if (mode == nullptr) {
-        std::cerr << "Failed to get video mode\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    GLFWmonitor* monitorForWindow = nullptr; 
-
-    if (fullscreen) {
-        monitorForWindow = primaryMonitor;
-        width = mode->width;   
-        height = mode->height;
-        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
-    } 
-    else if (maximized) {
-        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
-        
-        width = mode->width;
-        height = mode->height;
-    }
-
-    GLFWwindow* window = glfwCreateWindow(width, height, title, monitorForWindow, nullptr);
-    
-    if (!window) {
-        std::cerr << "Failed to create GLFW window.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-    glfwMakeContextCurrent(window);
-
-    glewExperimental = GL_TRUE;
-    if (glewInit() != GLEW_OK) {
-        std::cerr << "Failed to initialize GLEW.\n";
-        glfwTerminate();
-        return nullptr;
-    }
-
-    glEnable(GL_DEPTH_TEST);
-
-    int bufferWidth, bufferHeight;
-    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
-    glViewport(0, 0, bufferWidth, bufferHeight);
-
-    glEnable(GL_BLEND);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    
-    return window;
+static const char* TRAIL_VS = R"glsl(
+#version 330 core
+layout(location=0) in vec3 aPos;
+uniform mat4 view;
+uniform mat4 projection;
+void main() {
+    gl_Position = projection * view * vec4(aPos, 1.0);
 }
+)glsl";
+
+static const char* TRAIL_FS = R"glsl(
+#version 330 core
+out vec4 FragColor;
+uniform vec4 color;
+void main() {
+    FragColor = color;
+}
+)glsl";
 
 // перевод сферических координат в декартовы 
 static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
@@ -95,44 +55,51 @@ static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
 
 //==PUBLIC BLOCK==
 
-Renderer::Renderer(int /*w*/, int /*h*/) {
-    program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
-    glUseProgram(program_);
-    
-    uModel_ = glGetUniformLocation(program_, "model");
-    uView_  = glGetUniformLocation(program_, "view");
-    uProj_  = glGetUniformLocation(program_, "projection");
-    uColor_ = glGetUniformLocation(program_, "objectColor");
-
-    initSphereGeometry();
-    initCubeGeometry();
-    initPointGeometry();
+Renderer::Renderer() {
 }
 
 Renderer::~Renderer() {
-    glDeleteVertexArrays(1, &sphereVAO_); glDeleteBuffers(1, &sphereVBO_);
-    glDeleteVertexArrays(1, &cubeVAO_);   glDeleteBuffers(1, &cubeVBO_);
-    glDeleteVertexArrays(1, &pointVAO_);  glDeleteBuffers(1, &pointVBO_);
-    glDeleteProgram(program_);
+    if (successInit_) {
+        glDeleteVertexArrays(1, &sphereVAO_); glDeleteBuffers(1, &sphereVBO_);
+        glDeleteVertexArrays(1, &cubeVAO_);   glDeleteBuffers(1, &cubeVBO_);
+        glDeleteVertexArrays(1, &pointVAO_);  glDeleteBuffers(1, &pointVBO_);
+        glDeleteProgram(program_);
+    }
+}
+
+bool Renderer::init(int width,  int height, const char* title, bool fullscreen, bool maximized) {
+    if (!initWindow(width, height, title, fullscreen, maximized)) {
+        successInit_ = false; 
+        return false; 
+    }
+
+    initProgram();
+
+    initCubeGeometry();
+    initPointGeometry();
+    initSphereGeometry();
+    initTrailVAO_VBO(); 
+    successInit_ = true;  
+    return true; 
 }
 
 void Renderer::setProjection(float fov_deg,
-                             float aspect,
                              float znear,
                              float zfar)
 {
+    int width, height;
+    glfwGetFramebufferSize(window_, &width, &height);
+    float aspect = (float) width / height; 
     glUseProgram(program_);
-    glm::mat4 P = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
-    glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(P));
+    projectionMatrix_ = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
+    glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
 }
 
-void Renderer::updateView(const glm::vec3& pos,
-                          const glm::vec3& front,
-                          const glm::vec3& up)
+void Renderer::updateView(const Camera& camera)
 {
+    viewMatrix_ = camera.getViewMatrix(); 
     glUseProgram(program_);
-    glm::mat4 V = glm::lookAt(pos, pos + front, up);
-    glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(V));
+    glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(viewMatrix_));
 }
 
 void Renderer::drawObjects(const std::vector<Object>& objs) const {
@@ -179,6 +146,54 @@ void Renderer::drawObjects(const std::vector<Object>& objs) const {
         }
         glBindVertexArray(0);
     }
+}
+
+void Renderer::resizeWindow(int w, int h) {
+    glfwSetWindowSize(window_, w, h);
+    int frW, frH;
+    glfwGetFramebufferSize(window_, &frW, &frH);
+    glViewport(0, 0, frW, frH);
+}
+
+void Renderer::renderFrame(const std::vector<Object>& objs, const Camera& cam) {
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    
+    updateView(cam);
+    
+    drawTrails(objs);
+    drawObjects(objs);
+    
+    glfwSwapBuffers(window_);
+}
+
+void Renderer::drawTrails(const std::vector<Object>& objs) const {
+    glUseProgram(trailProgram_);
+    
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
+
+    glBindVertexArray(trailVAO_);
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO_);
+
+    for (const auto& obj : objs) {
+        if (obj.trail.size() < 2) continue;
+
+        std::vector<glm::vec3> points(obj.trail.begin(), obj.trail.end());
+        points.push_back(obj.position); 
+
+        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
+        
+        glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+        glEnableVertexAttribArray(0);
+
+        glm::vec4 trailColor = obj.color * 0.7f;
+        trailColor.a = 0.5f; 
+        glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
+
+        glDrawArrays(GL_LINE_STRIP, 0, points.size());
+    }
+    glBindVertexArray(0);
 }
 
 //==PRIVATE BLOCK==
@@ -297,4 +312,79 @@ void Renderer::initSphereGeometry() {
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
     glBindVertexArray(0);
+}
+
+void Renderer::initTrailVAO_VBO() {
+    glGenVertexArrays(1, &trailVAO_);
+    glGenBuffers(1, &trailVBO_);
+}
+
+bool Renderer::initWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
+    if (!glfwInit()) {
+        std::cerr << "Failed to initialize GLFW\n";
+        return false;
+    }
+
+    GLFWmonitor* primaryMonitor = glfwGetPrimaryMonitor();
+    const GLFWvidmode* mode = glfwGetVideoMode(primaryMonitor);
+
+    if (mode == nullptr) {
+        std::cerr << "Failed to get video mode\n";
+        glfwTerminate();
+        return false;
+    }
+
+    GLFWmonitor* monitorForWindow = nullptr; 
+
+    if (fullscreen) {
+        monitorForWindow = primaryMonitor;
+        width = mode->width;   
+        height = mode->height;
+        glfwWindowHint(GLFW_REFRESH_RATE, mode->refreshRate);
+    } 
+    else if (maximized) {
+        glfwWindowHint(GLFW_MAXIMIZED, GLFW_TRUE);
+        
+        width = mode->width;
+        height = mode->height;
+    }
+
+    GLFWwindow* window = glfwCreateWindow(width, height, title, monitorForWindow, nullptr);
+    
+    if (!window) {
+        std::cerr << "Failed to create GLFW window.\n";
+        glfwTerminate();
+        return false;
+    }
+    glfwMakeContextCurrent(window);
+
+    glewExperimental = GL_TRUE;
+    if (glewInit() != GLEW_OK) {
+        std::cerr << "Failed to initialize GLEW.\n";
+        glfwTerminate();
+        return false;
+    }
+
+    glEnable(GL_DEPTH_TEST);
+
+    int bufferWidth, bufferHeight;
+    glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);
+    glViewport(0, 0, bufferWidth, bufferHeight);
+
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    
+    window_ = window; 
+    return true;
+}
+
+void Renderer::initProgram() {
+    program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
+    trailProgram_ = compileProgram(TRAIL_VS, TRAIL_FS);
+    glUseProgram(program_);
+    
+    uModel_ = glGetUniformLocation(program_, "model");
+    uView_  = glGetUniformLocation(program_, "view");
+    uProj_  = glGetUniformLocation(program_, "projection");
+    uColor_ = glGetUniformLocation(program_, "objectColor");
 }

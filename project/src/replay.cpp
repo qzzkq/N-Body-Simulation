@@ -23,21 +23,9 @@
 #include "renderer.hpp"
 #include "control.hpp"
 #include "physics.hpp"
+#include "state.hpp"
+#include "camera.hpp"
 using namespace H5;
-
-bool running = true;
-bool pause   = false;
-
-glm::vec3 cameraPos   = glm::vec3(0.0f, 0.0f, 1.0f);
-glm::vec3 cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
-
-float lastX = 400.0f, lastY = 300.0f;
-float yaw   = -90.0f;
-float pitch = 0.0f;
-
-float dt        = 0.0f;
-float timeScale = 1.0f;   // скорость воспроизведения
 
 char title[256];
 
@@ -65,6 +53,10 @@ static ArrayType GetPosType() {
 }
 
 int main(int argc, char** argv) {
+
+    Camera cam; 
+    SimState state; 
+
 #ifdef _WIN32
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
@@ -138,23 +130,20 @@ int main(int argc, char** argv) {
 
     bool fullscreen = false;
     bool maximized = true;
-    GLFWwindow* window = InitWindow(1280, 720, "3D_TEST", fullscreen, maximized);
-    if (!window) return 1;
+    Renderer renderer;
+    if (!renderer.init(1280, 720, "N-Body simulation", fullscreen, maximized)) {
+        return 1;
+    }
 
-    int width, height;
-    glfwGetFramebufferSize(window, &width, &height);
-    Renderer renderer(width, height);
-    renderer.setProjection(65.0f, (float)width/height, 0.1f, 100000.0f);
+    renderer.setProjection(65.0f, 0.1f, 100000.0f);
 
-    cameraPos   = glm::vec3(0.0f, 50.0f, 250.0f);
-    cameraFront = glm::vec3(0.0f, 0.0f, -1.0f);
-    cameraUp    = glm::vec3(0.0f, 1.0f,  0.0f);
+    cam.pos = glm::vec3(0.0f, 50.0f, 250.0f);
+    cam.front = glm::vec3(0.0f, 0.0f, -1.0f);
+    cam.up    = glm::vec3(0.0f, 1.0f,  0.0f);
 
     renderer.setRenderMode(RenderMode::Sphere);
-    
-    float initMass = 1.0f;
 
-    Control control(window, objs, cameraPos, cameraFront, cameraUp, dt, timeScale, pause, running, yaw, pitch, lastX, lastY, initMass);
+    Control control(renderer.getWindow(), objs, cam, state);
     control.attach();
 
     double playbackTime = 0.0;
@@ -168,14 +157,14 @@ int main(int argc, char** argv) {
     
     std::vector<glm::dvec3> posBuffer(numBodies);
 
-    while (!glfwWindowShouldClose(window) && running) {
+    while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
         double now = glfwGetTime();
         double realDt = now - lastRealTime;
         lastRealTime = now;
-        dt = (float)realDt;
+        state.deltaTime = (float)realDt;
 
-        if (!pause) {
-            playbackTime += realDt * timeScale;
+        if (!state.pause) {
+            playbackTime += realDt * state.timeScale;
         }
 
         if (playbackTime > maxTime) playbackTime = 0.0;
@@ -185,6 +174,13 @@ int main(int argc, char** argv) {
         if (currentFrameIdx >= numFrames) currentFrameIdx = numFrames - 1;
 
         if (currentFrameIdx != lastReadFrameIdx) {
+
+            if (currentFrameIdx < lastReadFrameIdx && lastReadFrameIdx != 99999999999) {
+                for (auto& obj : objs) {
+                    obj.trail.clear(); 
+                }
+            }
+
             hsize_t offset[2] = { static_cast<hsize_t>(currentFrameIdx), 0 };
             hsize_t count[2]  = { 1, static_cast<hsize_t>(numBodies) };
             
@@ -200,22 +196,21 @@ int main(int argc, char** argv) {
                 objs[i].position = posBuffer[i];
             }
 
+            for(auto& obj : objs) obj.updateTrail(); 
+
             lastReadFrameIdx = currentFrameIdx;
         }
 
-        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-        renderer.updateView(cameraPos, cameraFront, cameraUp);
-        renderer.drawObjects(objs);
+        renderer.renderFrame(objs, cam); 
 
         std::snprintf(title, sizeof(title),
                       "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
-                      playbackTime, maxTime, currentFrameIdx, timeScale);
-        glfwSetWindowTitle(window, title);
-
-        glfwSwapBuffers(window);
+                      playbackTime, maxTime, currentFrameIdx, state.timeScale);
+        glfwSetWindowTitle(renderer.getWindow(), title);
         glfwPollEvents();
     }
 
     glfwTerminate();
     return 0;
+    
 }

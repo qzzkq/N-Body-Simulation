@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <optional>
 #include <vector>
+#include <deque> 
 
 class Object {
 public:
@@ -14,6 +15,7 @@ public:
     // Визуальные параметры
     float radius; 
     glm::vec4 color;
+    std::deque<glm::vec3> trail;
 
     // Флаги логики
     bool Initalizing = false;
@@ -30,4 +32,24 @@ public:
     void UpdatePos(double deltaTime);
     void accelerate(double x, double y, double z, double deltaTime);
     glm::dvec3 GetPos() const;
+
+    void updateTrail() {
+        trailSkipCounter++;
+        if (trailSkipCounter > 5) { 
+            trail.push_back(position);
+            if (trail.size() > MAX_TRAIL_LENGTH) {
+                trail.pop_front();
+            }
+            trailSkipCounter = 0;
+        }
+    }
+
+    void resetTrail() {
+        trail.clear();
+        trailSkipCounter = 0;
+    }
+
+private: 
+    static const size_t MAX_TRAIL_LENGTH = 150; 
+    int trailSkipCounter = 0;
 };
