@@ -219,9 +219,17 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
         DataSpace tracksSpace(2, dims, maxDims);
 
         DSetCreatPropList prop;
-        hsize_t chunkDims[2] = {1, nb}; 
+        hsize_t timeStepsInChunk = 1;
+        size_t frameSize = nb * 3 * sizeof(double);
+        if (frameSize > 0) {
+             timeStepsInChunk = 262144 / frameSize;
+             if (timeStepsInChunk < 1) timeStepsInChunk = 1;
+        }
+        
+        hsize_t chunkDims[2] = {timeStepsInChunk, nb}; 
         prop.setChunk(2, chunkDims);
-        prop.setDeflate(4);
+        prop.setShuffle(); 
+        prop.setDeflate(6);
 
         file.createDataSet("tracks", GetPosType(), tracksSpace, prop);
     }

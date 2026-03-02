@@ -263,7 +263,7 @@ if (!loaded) {
                       progress, gSimTime, targetTime, frameIndex);
                 glfwSetWindowTitle(renderer.getWindow(), title);
             }
-            if (stepCounter % (10) == 0) {
+            if (stepCounter % FIXED_STEPS == 0) {
                 WriteSimulationFrame(framesFile, objs, frameIndex);
                 ++frameIndex;
             }
