@@ -15,7 +15,7 @@ public:
     // Визуальные параметры
     float radius; 
     glm::vec4 color;
-    std::deque<glm::vec3> trail;
+    std::vector<glm::vec3> trail;
 
     // Флаги логики
     bool Initalizing = false;
@@ -33,16 +33,21 @@ public:
     void accelerate(double x, double y, double z, double deltaTime);
     glm::dvec3 GetPos() const;
 
-    void updateTrail() {
-        trailSkipCounter++;
-        if (trailSkipCounter > 5) { 
+    void updateTrail(bool force = false) {
+        if (force || trail.empty()) {
             trail.push_back(position);
-            if (trail.size() > MAX_TRAIL_LENGTH) {
-                trail.pop_front();
-            }
-            trailSkipCounter = 0;
+            return;
+        }
+
+        float distanceThreshold = 1.0f; 
+        if (glm::distance(glm::vec3(position), trail.back()) > distanceThreshold) {
+            trail.push_back(position);
+        
+        if (trail.size() > MAX_TRAIL_LENGTH) {
+            trail.erase(trail.begin()); 
         }
     }
+}
 
     void resetTrail() {
         trail.clear();

@@ -36,7 +36,7 @@
 #endif
 
 double gSimTime = 0.0;
-float fixedDt = 1.0f/60; // шаг времени;
+float fixedDt = 1.0f/60; 
 const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
@@ -221,10 +221,6 @@ if (!loaded) {
                 for(auto& obj : objs) obj.updateTrail();
             }
 
-            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            //renderer.updateView(cam);
-            //renderer.drawObjects(objs);
-
             renderer.renderFrame(objs, cam);
             double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
@@ -233,7 +229,6 @@ if (!loaded) {
                   state.timeScale, fps, objs.size(), gSimTime);
             glfwSetWindowTitle(renderer.getWindow(), title);
 
-            //glfwSwapBuffers(renderer.getWindow());
             glfwPollEvents();
         }
 

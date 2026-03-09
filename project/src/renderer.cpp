@@ -179,10 +179,7 @@ void Renderer::drawTrails(const std::vector<Object>& objs) const {
     for (const auto& obj : objs) {
         if (obj.trail.size() < 2) continue;
 
-        std::vector<glm::vec3> points(obj.trail.begin(), obj.trail.end());
-        points.push_back(obj.position); 
-
-        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, obj.trail.size() * sizeof(glm::vec3), obj.trail.data(), GL_DYNAMIC_DRAW);
         
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
         glEnableVertexAttribArray(0);
@@ -191,7 +188,7 @@ void Renderer::drawTrails(const std::vector<Object>& objs) const {
         trailColor.a = 0.5f; 
         glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
 
-        glDrawArrays(GL_LINE_STRIP, 0, points.size());
+        glDrawArrays(GL_LINE_STRIP, 0, obj.trail.size());
     }
     glBindVertexArray(0);
 }
