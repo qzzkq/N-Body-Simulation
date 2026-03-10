@@ -60,7 +60,7 @@ int main() {
     }
 
     renderer.setProjection(65.0f, 8.3f, 100000.0f);
-    using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause, int iterations);
+    using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause);
     Handler simulationStep = nullptr;
 
     RenderMode renderMode = RenderMode::Sphere;
@@ -217,11 +217,11 @@ if (!loaded) {
             int substeps = 0;
 
             while (accumulator >= fixedDt) {
-                simulationStep(objs, fixedDt, state.pause, 1);
+                simulationStep(objs, fixedDt, state.pause);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
-                for(auto& obj : objs) obj.updateTrail();
+                // for(auto& obj : objs) obj.updateTrail();
             }
 
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -250,7 +250,7 @@ if (!loaded) {
         std::cout << "Начинаем расчет..." << std::endl;
 
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime) {
-            simulationStep(objs, fixedDt, false, 1);
+            simulationStep(objs, fixedDt, false);
             gSimTime += fixedDt;
             stepCounter += 1;
             if (stepCounter % (1 * 10) == 0) {
