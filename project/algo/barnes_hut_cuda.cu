@@ -5,50 +5,53 @@
 #include <iostream>
 #include "barnes_hut_cuda.cuh"
 #include "object.hpp"
+#include "physics.hpp"
 
 #define THREADS_PER_BLOCK 256
 #define MAX_STACK 64
-#define THETA 0.5f
-#define G_CONST 6.6743e-20f
-#define SOFTENING_SQ 0.1f 
+#define THETA 0.5
+
+static constexpr double G_CONST = physics::G;
+static constexpr double SOFTENING_AU = 1.0e6 * physics::METERS_TO_AU; // 1000 km
+static constexpr double SOFTENING_SQ = SOFTENING_AU * SOFTENING_AU;
 
 struct __align__(16) GpuNode {
-    float3 center; 
-    float mass;
-    float3 bMin;   
-    float size;
+    double3 center; 
+    double mass;
+    double3 bMin;   
+    double size;
     int children[8];
     int bodyIdx;
 };
 
-static float4* d_posMass = nullptr;
-static float3* d_vel = nullptr;
-static float3* d_acc = nullptr;
+static double4* d_posMass = nullptr;
+static double3* d_vel = nullptr;
+static double3* d_acc = nullptr;
 static GpuNode* d_nodes = nullptr;
 static int* d_nodeCounter = nullptr; 
-static float* d_minMax = nullptr; 
+static double* d_minMax = nullptr; 
 
 static size_t currentCapacity = 0;
 
-__device__ void atomicMinFloat(float* addr, float value) {
-    float old = *addr, assumed;
+__device__ void atomicMinDouble(double* addr, double value) {
+    double old = *addr, assumed;
     if (old <= value) return;
     do {
         assumed = old;
-        old = __int_as_float(atomicCAS((int*)addr, __float_as_int(assumed), __float_as_int(value)));
+        old = __longlong_as_double(atomicCAS((unsigned long long int*)addr, __double_as_longlong(assumed), __double_as_longlong(value)));
     } while (assumed != old && old > value);
 }
 
-__device__ void atomicMaxFloat(float* addr, float value) {
-    float old = *addr, assumed;
+__device__ void atomicMaxDouble(double* addr, double value) {
+    double old = *addr, assumed;
     if (old >= value) return;
     do {
         assumed = old;
-        old = __int_as_float(atomicCAS((int*)addr, __float_as_int(assumed), __float_as_int(value)));
+        old = __longlong_as_double(atomicCAS((unsigned long long int*)addr, __double_as_longlong(assumed), __double_as_longlong(value)));
     } while (assumed != old && old < value);
 }
 
-__device__ int getOctant(float tx, float ty, float tz, float px, float py, float pz) {
+__device__ int getOctant(double tx, double ty, double tz, double px, double py, double pz) {
     int idx = 0;
     if (px >= tx) idx |= 1;
     if (py >= ty) idx |= 2;
@@ -56,11 +59,11 @@ __device__ int getOctant(float tx, float ty, float tz, float px, float py, float
     return idx;
 }
 
-__device__ void initNode(GpuNode* nodes, int idx, float3 bMin, float size) {
+__device__ void initNode(GpuNode* nodes, int idx, double3 bMin, double size) {
     nodes[idx].bMin = bMin;
     nodes[idx].size = size;
-    nodes[idx].mass = 0.0f;
-    nodes[idx].center = make_float3(0.0f, 0.0f, 0.0f);
+    nodes[idx].mass = 0.0;
+    nodes[idx].center = make_double3(0.0, 0.0, 0.0);
     nodes[idx].bodyIdx = -1;
     #pragma unroll
     for (int i = 0; i < 8; ++i) {
@@ -68,46 +71,46 @@ __device__ void initNode(GpuNode* nodes, int idx, float3 bMin, float size) {
     }
 }
 
-__global__ void computeBoundingBoxKernel(const float4* posMass, int numBodies, float* d_minMax) {
-    __shared__ float s_minMax[6]; 
+__global__ void computeBoundingBoxKernel(const double4* posMass, int numBodies, double* d_minMax) {
+    __shared__ double s_minMax[6]; 
 
     if (threadIdx.x == 0) {
-        s_minMax[0] = 1e30f; s_minMax[1] = -1e30f;
-        s_minMax[2] = 1e30f; s_minMax[3] = -1e30f;
-        s_minMax[4] = 1e30f; s_minMax[5] = -1e30f;
+        s_minMax[0] = 1e30; s_minMax[1] = -1e30;
+        s_minMax[2] = 1e30; s_minMax[3] = -1e30;
+        s_minMax[4] = 1e30; s_minMax[5] = -1e30;
     }
     __syncthreads();
 
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx < numBodies) {
-        float4 p = posMass[idx];
-        atomicMinFloat(&s_minMax[0], p.x); atomicMaxFloat(&s_minMax[1], p.x);
-        atomicMinFloat(&s_minMax[2], p.y); atomicMaxFloat(&s_minMax[3], p.y);
-        atomicMinFloat(&s_minMax[4], p.z); atomicMaxFloat(&s_minMax[5], p.z);
+        double4 p = posMass[idx];
+        atomicMinDouble(&s_minMax[0], p.x); atomicMaxDouble(&s_minMax[1], p.x);
+        atomicMinDouble(&s_minMax[2], p.y); atomicMaxDouble(&s_minMax[3], p.y);
+        atomicMinDouble(&s_minMax[4], p.z); atomicMaxDouble(&s_minMax[5], p.z);
     }
     __syncthreads();
 
     if (threadIdx.x == 0) {
-        atomicMinFloat(&d_minMax[0], s_minMax[0]); atomicMaxFloat(&d_minMax[1], s_minMax[1]);
-        atomicMinFloat(&d_minMax[2], s_minMax[2]); atomicMaxFloat(&d_minMax[3], s_minMax[3]);
-        atomicMinFloat(&d_minMax[4], s_minMax[4]); atomicMaxFloat(&d_minMax[5], s_minMax[5]);
+        atomicMinDouble(&d_minMax[0], s_minMax[0]); atomicMaxDouble(&d_minMax[1], s_minMax[1]);
+        atomicMinDouble(&d_minMax[2], s_minMax[2]); atomicMaxDouble(&d_minMax[3], s_minMax[3]);
+        atomicMinDouble(&d_minMax[4], s_minMax[4]); atomicMaxDouble(&d_minMax[5], s_minMax[5]);
     }
 }
 
-__global__ void initRootKernel(GpuNode* nodes, float cx, float cy, float cz, float maxSpan) {
+__global__ void initRootKernel(GpuNode* nodes, double cx, double cy, double cz, double maxSpan) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
-        initNode(nodes, 0, make_float3(cx, cy, cz), maxSpan);
+        initNode(nodes, 0, make_double3(cx, cy, cz), maxSpan);
     }
 }
 
-__global__ void buildTreeKernel(const float4* __restrict__ posMass, GpuNode* __restrict__ nodes, int numBodies, int* nodeCounter, int maxNodes) {
+__global__ void buildTreeKernel(const double4* __restrict__ posMass, GpuNode* __restrict__ nodes, int numBodies, int* nodeCounter, int maxNodes) {
     int i = blockIdx.x * blockDim.x + threadIdx.x;
     if (i >= numBodies) return;
 
-    float4 p = posMass[i];
-    float3 pos = make_float3(p.x, p.y, p.z);
-    float mass = p.w;
-    if (mass <= 0.0f) return;
+    double4 p = posMass[i];
+    double3 pos = make_double3(p.x, p.y, p.z);
+    double mass = p.w;
+    if (mass <= 0.0) return;
 
     int curr = 0; 
     
@@ -117,7 +120,7 @@ __global__ void buildTreeKernel(const float4* __restrict__ posMass, GpuNode* __r
         atomicAdd(&nodes[curr].center.y, pos.y * mass);
         atomicAdd(&nodes[curr].center.z, pos.z * mass);
         
-        if (nodes[curr].size < 1e-5f) return; 
+        if (nodes[curr].size < 1e-8) return; 
         
         while (true) {
             int oldBody = atomicCAS(&nodes[curr].bodyIdx, -1, i);
@@ -126,23 +129,23 @@ __global__ void buildTreeKernel(const float4* __restrict__ posMass, GpuNode* __r
             
             if (oldBody >= 0) {
                 if (atomicCAS(&nodes[curr].bodyIdx, oldBody, -2) == oldBody) {
-                    float3 currPos = nodes[curr].bMin;
-                    float currSize = nodes[curr].size;
+                    double3 currPos = nodes[curr].bMin;
+                    double currSize = nodes[curr].size;
                     
-                    float4 oldP = posMass[oldBody];
-                    float3 oldPos3 = make_float3(oldP.x, oldP.y, oldP.z);
-                    float oldMass = oldP.w;
+                    double4 oldP = posMass[oldBody];
+                    double3 oldPos3 = make_double3(oldP.x, oldP.y, oldP.z);
+                    double oldMass = oldP.w;
                     int octOld = getOctant(currPos.x, currPos.y, currPos.z, oldPos3.x, oldPos3.y, oldPos3.z);
                     
-                    float qs = currSize * 0.25f;
-                    float nx = currPos.x + ((octOld & 1) ? qs : -qs);
-                    float ny = currPos.y + ((octOld & 2) ? qs : -qs);
-                    float nz = currPos.z + ((octOld & 4) ? qs : -qs);
+                    double qs = currSize * 0.25;
+                    double nx = currPos.x + ((octOld & 1) ? qs : -qs);
+                    double ny = currPos.y + ((octOld & 2) ? qs : -qs);
+                    double nz = currPos.z + ((octOld & 4) ? qs : -qs);
                     
                     int newChild = atomicAdd(nodeCounter, 1);
                     if (newChild >= maxNodes) return; 
 
-                    initNode(nodes, newChild, make_float3(nx, ny, nz), currSize * 0.5f);
+                    initNode(nodes, newChild, make_double3(nx, ny, nz), currSize * 0.5);
                     
                     nodes[newChild].mass = oldMass;
                     nodes[newChild].center.x = oldPos3.x * oldMass;
@@ -156,21 +159,21 @@ __global__ void buildTreeKernel(const float4* __restrict__ posMass, GpuNode* __r
             }
             
             if (nodes[curr].bodyIdx == -2) {
-                float3 currPos = nodes[curr].bMin;
-                float currSize = nodes[curr].size;
+                double3 currPos = nodes[curr].bMin;
+                double currSize = nodes[curr].size;
                 int oct = getOctant(currPos.x, currPos.y, currPos.z, pos.x, pos.y, pos.z);
                 
                 int child = nodes[curr].children[oct];
                 if (child == -1) {
-                    float qs = currSize * 0.25f;
-                    float nx = currPos.x + ((oct & 1) ? qs : -qs);
-                    float ny = currPos.y + ((oct & 2) ? qs : -qs);
-                    float nz = currPos.z + ((oct & 4) ? qs : -qs);
+                    double qs = currSize * 0.25;
+                    double nx = currPos.x + ((oct & 1) ? qs : -qs);
+                    double ny = currPos.y + ((oct & 2) ? qs : -qs);
+                    double nz = currPos.z + ((oct & 4) ? qs : -qs);
                     
                     int newChild = atomicAdd(nodeCounter, 1);
                     if (newChild >= maxNodes) return;
 
-                    initNode(nodes, newChild, make_float3(nx, ny, nz), currSize * 0.5f);
+                    initNode(nodes, newChild, make_double3(nx, ny, nz), currSize * 0.5);
                     __threadfence();
                     
                     int oldChild = atomicCAS(&nodes[curr].children[oct], -1, newChild);
@@ -189,19 +192,19 @@ __global__ void buildTreeKernel(const float4* __restrict__ posMass, GpuNode* __r
 }
 
 __global__ void computeForcesKernel(
-    const float4* __restrict__ posMass,
-    float3* __restrict__ vel,
-    float3* __restrict__ acc,
+    const double4* __restrict__ posMass,
+    double3* __restrict__ vel,
+    double3* __restrict__ acc,
     const GpuNode* __restrict__ nodes,
     int numBodies,
-    float dt
+    double dt
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numBodies) return;
 
-    float4 myP = posMass[idx];
-    float3 myPos = make_float3(myP.x, myP.y, myP.z);
-    float3 newForce = make_float3(0.0f, 0.0f, 0.0f);
+    double4 myP = posMass[idx];
+    double3 myPos = make_double3(myP.x, myP.y, myP.z);
+    double3 newForce = make_double3(0.0, 0.0, 0.0);
 
     int stack[MAX_STACK];
     int stackTop = 0;
@@ -211,22 +214,23 @@ __global__ void computeForcesKernel(
         int nodeIdx = stack[--stackTop];
         GpuNode n = nodes[nodeIdx];
 
-        float3 com = make_float3(n.center.x / n.mass, n.center.y / n.mass, n.center.z / n.mass);
+        if (n.mass <= 0.0) continue;
+        double3 com = make_double3(n.center.x / n.mass, n.center.y / n.mass, n.center.z / n.mass);
 
-        float dx = com.x - myPos.x;
-        float dy = com.y - myPos.y;
-        float dz = com.z - myPos.z;
+        double dx = com.x - myPos.x;
+        double dy = com.y - myPos.y;
+        double dz = com.z - myPos.z;
         
-        float distSq = dx*dx + dy*dy + dz*dz + SOFTENING_SQ; 
-        float invDist = rsqrtf(distSq); 
+        double distSq = dx*dx + dy*dy + dz*dz + SOFTENING_SQ; 
+        double invDist = 1.0 / sqrt(distSq); 
 
         bool isLeaf = (n.bodyIdx >= 0); 
         
         if (isLeaf && n.bodyIdx == idx) continue;
 
         if (isLeaf || (n.size * invDist < THETA)) {
-            float invDistCube = invDist * invDist * invDist;
-            float f = (G_CONST * n.mass) * invDistCube;
+            double invDistCube = invDist * invDist * invDist;
+            double f = (G_CONST * n.mass) * invDistCube;
             
             newForce.x += f * dx;
             newForce.y += f * dy;
@@ -249,10 +253,10 @@ __global__ void computeForcesKernel(
 }
 
 __global__ void integratePositionKernel(
-    float4* posMass,
-    const float3* vel,
+    double4* posMass,
+    const double3* vel,
     int numBodies,
-    float dt
+    double dt
 ) {
     int idx = blockIdx.x * blockDim.x + threadIdx.x;
     if (idx >= numBodies) return;
@@ -264,12 +268,12 @@ __global__ void integratePositionKernel(
 
 void InitBarnesHutCUDA(size_t maxObjects) {
     currentCapacity = maxObjects + 4096;
-    cudaMalloc(&d_posMass, currentCapacity * sizeof(float4));
-    cudaMalloc(&d_vel, currentCapacity * sizeof(float3));
-    cudaMalloc(&d_acc, currentCapacity * sizeof(float3));
+    cudaMalloc(&d_posMass, currentCapacity * sizeof(double4));
+    cudaMalloc(&d_vel, currentCapacity * sizeof(double3));
+    cudaMalloc(&d_acc, currentCapacity * sizeof(double3));
     cudaMalloc(&d_nodes, currentCapacity * 4 * sizeof(GpuNode));
     cudaMalloc(&d_nodeCounter, sizeof(int));
-    cudaMalloc(&d_minMax, 6 * sizeof(float)); 
+    cudaMalloc(&d_minMax, 6 * sizeof(double)); 
 }
 
 void CleanupBarnesHutCUDA() {
@@ -281,7 +285,7 @@ void CleanupBarnesHutCUDA() {
     if (d_minMax) cudaFree(d_minMax);
 }
 
-void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause) {
+void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool pause) {
     if (objs.empty() || pause) return;
 
     size_t N = objs.size();
@@ -290,32 +294,32 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause
         InitBarnesHutCUDA(N * 2);
     }
 
-    std::vector<float4> h_posMass(N);
-    std::vector<float3> h_vel(N);
+    std::vector<double4> h_posMass(N);
+    std::vector<double3> h_vel(N);
     
     for (size_t i = 0; i < N; ++i) {
         glm::dvec3 p = objs[i].GetPos();
-        h_posMass[i] = make_float4((float)p.x, (float)p.y, (float)p.z, (float)objs[i].mass);
-        h_vel[i] = make_float3((float)objs[i].velocity.x, (float)objs[i].velocity.y, (float)objs[i].velocity.z);
+        h_posMass[i] = make_double4(p.x, p.y, p.z, objs[i].mass);
+        h_vel[i] = make_double3(objs[i].velocity.x, objs[i].velocity.y, objs[i].velocity.z);
     }
 
-    cudaMemcpy(d_posMass, h_posMass.data(), N * sizeof(float4), cudaMemcpyHostToDevice);
-    cudaMemcpy(d_vel, h_vel.data(), N * sizeof(float3), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_posMass, h_posMass.data(), N * sizeof(double4), cudaMemcpyHostToDevice);
+    cudaMemcpy(d_vel, h_vel.data(), N * sizeof(double3), cudaMemcpyHostToDevice);
 
     int blocks = ((int)N + THREADS_PER_BLOCK - 1) / THREADS_PER_BLOCK;
 
-    float h_initMinMax[6] = {1e30f, -1e30f, 1e30f, -1e30f, 1e30f, -1e30f};
-    cudaMemcpy(d_minMax, h_initMinMax, 6 * sizeof(float), cudaMemcpyHostToDevice);
+    double h_initMinMax[6] = {1e30, -1e30, 1e30, -1e30, 1e30, -1e30};
+    cudaMemcpy(d_minMax, h_initMinMax, 6 * sizeof(double), cudaMemcpyHostToDevice);
     
     computeBoundingBoxKernel<<<blocks, THREADS_PER_BLOCK>>>(d_posMass, (int)N, d_minMax);
     
-    float h_minMax[6];
-    cudaMemcpy(h_minMax, d_minMax, 6 * sizeof(float), cudaMemcpyDeviceToHost);
+    double h_minMax[6];
+    cudaMemcpy(h_minMax, d_minMax, 6 * sizeof(double), cudaMemcpyDeviceToHost);
 
-    float cx = (h_minMax[0] + h_minMax[1]) * 0.5f;
-    float cy = (h_minMax[2] + h_minMax[3]) * 0.5f;
-    float cz = (h_minMax[4] + h_minMax[5]) * 0.5f;
-    float maxSpan = std::max({h_minMax[1] - h_minMax[0], h_minMax[3] - h_minMax[2], h_minMax[5] - h_minMax[4]}) * 1.01f;
+    double cx = (h_minMax[0] + h_minMax[1]) * 0.5;
+    double cy = (h_minMax[2] + h_minMax[3]) * 0.5;
+    double cz = (h_minMax[4] + h_minMax[5]) * 0.5;
+    double maxSpan = std::max({h_minMax[1] - h_minMax[0], h_minMax[3] - h_minMax[2], h_minMax[5] - h_minMax[4]}) * 1.01;
 
     initRootKernel<<<1, 1>>>(d_nodes, cx, cy, cz, maxSpan);
 
@@ -328,8 +332,8 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, float dt, bool pause
     computeForcesKernel<<<blocks, THREADS_PER_BLOCK>>>(d_posMass, d_vel, d_acc, d_nodes, (int)N, dt);
     integratePositionKernel<<<blocks, THREADS_PER_BLOCK>>>(d_posMass, d_vel, (int)N, dt);
 
-    cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(float4), cudaMemcpyDeviceToHost);
-    cudaMemcpy(h_vel.data(), d_vel, N * sizeof(float3), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost);
+    cudaMemcpy(h_vel.data(), d_vel, N * sizeof(double3), cudaMemcpyDeviceToHost);
 
     for (size_t i = 0; i < N; ++i) {
         objs[i].position = glm::dvec3((double)h_posMass[i].x, (double)h_posMass[i].y, (double)h_posMass[i].z);

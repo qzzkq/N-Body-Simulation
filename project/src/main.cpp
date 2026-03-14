@@ -9,6 +9,7 @@
 #include <cmath>
 #include <algorithm>
 #include <filesystem>
+#include <csignal>
 #include "object.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
@@ -36,14 +37,23 @@
 #endif
 
 double gSimTime = 0.0;
-float fixedDt = 1.0f/60; // шаг времени;
+double fixedDt = 1.0 / 3652.5; // шаг времени;
 const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
 std::vector<Object> objs = {};
+volatile sig_atomic_t g_Interrupt = 0;
+
+void signalHandler(int signum) {
+    if (signum == SIGINT) {
+        g_Interrupt = 1;
+    }
+}
 
 int main() {
+
+    std::signal(SIGINT, signalHandler);
 
 #ifdef _WIN32
     SetConsoleOutputCP(65001);
@@ -59,8 +69,8 @@ int main() {
         return -1;
     }
 
-    renderer.setProjection(65.0f, 8.3f, 100000.0f);
-    using Handler = void(*)(std::vector<Object>& objs, float dt, bool pause);
+    renderer.setProjection(65.0f, 0.01f, 500.0f);
+    using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause);
     Handler simulationStep = nullptr;
 
     RenderMode renderMode = RenderMode::Sphere;
@@ -118,8 +128,8 @@ int main() {
             break;
     }
 
-    // -------- выбор сценария (файл / рандом) --------
-    std::cout << "Загружаем сценарий из HDF5 или генерируем систему рандомно? [0/1]: " << std::flush;
+    // -------- выбор сценария (HDF5 / TXT / рандом) --------
+    std::cout << "Источник начальных условий: [0] HDF5, [1] TXT, [2] Random: " << std::flush;
     std::cin >> mode;
 
     if (mode == 0){
@@ -142,6 +152,19 @@ int main() {
 
         }
     }
+    else if (mode == 1) {
+        std::string txtPath;
+        std::cout << "Введите путь к TXT-файлу (пример: data/solar_system.txt): " << std::flush;
+        std::cin >> txtPath;
+
+        if (LoadSystemFromTextFile(txtPath, objs)) {
+            loaded = true;
+            std::cout << "Loaded " << objs.size() << " objects from text config\n";
+        } else {
+            std::cout << "Не удалось загрузить TXT. Генерируем рандомно.\n";
+        }
+    }
+
 if (!loaded) {
         GenParams params;
         params.seed = 42;
@@ -149,11 +172,11 @@ if (!loaded) {
         std::cout << "Количество тел: ";
         std::cin >> params.count;
 
-        params.centralMass = static_cast<double>(initMass) * 100000;
-        params.baseMass    = static_cast<double>(initMass);
-        params.minRadius   = 300.0f;
-        params.maxRadius   = 10000.0f;
-        params.spread      = 1000.0f; 
+        params.centralMass = 1.0;      // 1 масса Солнца
+        params.baseMass    = 3.0e-6;   // Масса Земли в солнечных
+        params.minRadius   = 5.0f;     // AU
+        params.maxRadius   = 40.0f;    // AU
+        params.spread      = 2.0f;     // AU
 
         std::vector<std::string> scenNames = scenarioManager->getNames();
         std::cout << "Выберите тип генерации:\n";
@@ -186,6 +209,8 @@ if (!loaded) {
 
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
+    const double initialEnergy = physics::calculateTotalEnergy(objs);
+
     Camera cam;
     SimState state; 
 
@@ -204,7 +229,7 @@ if (!loaded) {
     int stepCounter = 0;
 
     if (isRealTime) {
-        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
+        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && !g_Interrupt) {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
             
@@ -216,7 +241,7 @@ if (!loaded) {
 
             int substeps = 0;
 
-            while (accumulator >= fixedDt) {
+            while (accumulator >= fixedDt && !g_Interrupt) {
                 simulationStep(objs, fixedDt, state.pause);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
@@ -231,9 +256,12 @@ if (!loaded) {
             renderer.renderFrame(objs, cam);
             double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
+            const double currentEnergy = physics::calculateTotalEnergy(objs);
+            const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
+            const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
             std::snprintf(title, sizeof(title),
-                  "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f",
-                  state.timeScale, fps, objs.size(), gSimTime);
+                  "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f | Err: %.4f%%",
+                  state.timeScale, fps, objs.size(), gSimTime, errorPct);
             glfwSetWindowTitle(renderer.getWindow(), title);
 
             //glfwSwapBuffers(renderer.getWindow());
@@ -249,7 +277,7 @@ if (!loaded) {
         glfwSwapInterval(0);
         std::cout << "Начинаем расчет..." << std::endl;
 
-        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime) {
+        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime && !g_Interrupt) {
             simulationStep(objs, fixedDt, false);
             gSimTime += fixedDt;
             stepCounter += 1;
@@ -258,9 +286,12 @@ if (!loaded) {
 
                 renderer.renderFrame(objs, cam);
                 double progress = (gSimTime / targetTime) * 100.0;
+                const double currentEnergy = physics::calculateTotalEnergy(objs);
+                const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
+                const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
                 std::snprintf(title, sizeof(title),
-                      "BAKING... %.1f%% | Time: %.2f / %.2f | Saved: %zu",
-                      progress, gSimTime, targetTime, frameIndex);
+                      "BAKING... %.1f%% | Time: %.2f / %.2f | Saved: %zu | Err: %.4f%%",
+                      progress, gSimTime, targetTime, frameIndex, errorPct);
                 glfwSetWindowTitle(renderer.getWindow(), title);
             }
             if (stepCounter % FIXED_STEPS == 0) {
@@ -270,5 +301,17 @@ if (!loaded) {
         }
         std::cout << "Расчет завершен за " << (static_cast<int>(time(NULL)) - startTime) << " сек.\n";
     }
+
+    if (g_Interrupt) {
+        std::cout << "Получен SIGINT (Ctrl+C). Завершаем симуляцию и сохраняем текущее состояние...\n";
+    }
+
+    const std::string finalTextPath = "data/" + filename + "_final.txt";
+    if (SaveSystemToTextFile(finalTextPath, objs)) {
+        std::cout << "Финальное состояние сохранено в " << finalTextPath << "\n";
+    } else {
+        std::cout << "Не удалось сохранить финальное состояние в " << finalTextPath << "\n";
+    }
+
     CloseSimulationFile(framesFile, frameIndex);
 }

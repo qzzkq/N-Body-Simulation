@@ -3,6 +3,7 @@
 #include <optional>
 #include <vector>
 #include <deque> 
+#include <string>
 
 class Object {
 public:
@@ -15,6 +16,7 @@ public:
     // Визуальные параметры
     float radius; 
     glm::vec4 color;
+    std::string name;
     std::deque<glm::vec3> trail;
 
     // Флаги логики

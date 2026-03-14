@@ -1,69 +1,114 @@
 #include "brut_force.hpp"
+
 #include <cmath>
-#include <algorithm>
+#include <vector>
+
 #include <object.hpp>
 #include <physics.hpp>
-float G = physics::G;
-void simulationStepBrutForceCPU(std::vector<Object>& objs, float dt, bool pause) {
-    for (size_t i = 0; i < objs.size(); ++i) {
-        Object& obj = objs[i];
 
-        for (size_t j = i + 1; j < objs.size(); ++j) {
-            Object& obj2 = objs[j];
+#ifdef _OPENMP
+#include <omp.h>
+#endif
 
-            glm::dvec3 delta = obj2.GetPos() - obj.GetPos();
-            double distance = std::sqrt(delta.x * delta.x + delta.y * delta.y + delta.z * delta.z);
-            if (distance <= 0.0) {
+namespace {
+
+static constexpr double SOFTENING_AU = 1.0e6 * physics::METERS_TO_AU; // 1000 km
+
+void computeAccelerations(const std::vector<glm::dvec3>& positions,
+                          const std::vector<double>& masses,
+                          std::vector<glm::dvec3>& accelerations) {
+    const size_t n = positions.size();
+
+    #pragma omp parallel for schedule(static)
+    for (size_t i = 0; i < n; ++i) {
+        glm::dvec3 acc(0.0);
+        const glm::dvec3 pi = positions[i];
+
+        for (size_t j = 0; j < n; ++j) {
+            if (i == j) {
                 continue;
             }
 
-            glm::dvec3 dir = delta / distance;
-            double combinedRadius = obj.radius + obj2.radius;
+            const glm::dvec3 delta = positions[j] - pi;
+            const double distSq = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z + SOFTENING_AU * SOFTENING_AU;
 
-            double effectiveDistance = std::max(distance, combinedRadius);
-            double dist_m = effectiveDistance * 1000.0;        // м
-            double F = (G * obj.mass * obj2.mass) / (dist_m * dist_m);              // Н
-            float acc1_kmps2 = static_cast<float>((F / obj.mass)  / 1000.0);        // км/с²
-            float acc2_kmps2 = static_cast<float>((F / obj2.mass) / 1000.0);        // км/с²
-            glm::vec3 accObj  = glm::vec3(dir * static_cast<double>(acc1_kmps2));
-            glm::vec3 accObj2 = glm::vec3(-dir * static_cast<double>(acc2_kmps2));
+            const double invDist = 1.0 / std::sqrt(distSq);
+            const double invDist3 = invDist * invDist * invDist;
+            const double factor = physics::G * masses[j] * invDist3;
 
-            if (!pause) {
-                obj.accelerate(accObj.x, accObj.y, accObj.z, dt);
-                obj2.accelerate(accObj2.x, accObj2.y, accObj2.z, dt);
-            }
-            /*
-            if (distance < combinedRadius) {
-                glm::vec3 normal = glm::vec3(dir);
-                glm::vec3 relativeVelocity = glm::vec3(obj.velocity - obj2.velocity);
-                float relVelAlongNormal = glm::dot(relativeVelocity, normal);
-
-                if (relVelAlongNormal < 0.0f) {
-                    double restitution = 0.8;
-                    double invMass1 = 1.0 / obj.mass;
-                    double invMass2 = 1.0 / obj2.mass;
-                    double impulseScalar = -(1.0 + restitution) * static_cast<double>(relVelAlongNormal) / (invMass1 + invMass2);
-                    glm::dvec3 impulse = glm::dvec3(normal) * impulseScalar;
-                    obj.velocity += impulse * invMass1;
-                    obj2.velocity -= impulse * invMass2;
-                }
-
-                double penetration = combinedRadius - distance;
-                if (penetration > 0.0) {
-                    double invMass1 = 1.0 / obj.mass;
-                    double invMass2 = 1.0 / obj2.mass;
-                    double invMassSum = invMass1 + invMass2;
-                    if (invMassSum > 0.0) {
-                        double correctionScale = penetration / invMassSum;
-                        glm::dvec3 correction = glm::dvec3(normal) * correctionScale;
-                        obj.position -= correction * invMass1;
-                        obj2.position += correction * invMass2;
-                    }
-                }
-            */
+            acc += delta * factor;
         }
-        if (!pause) {
-            obj.UpdatePos(dt);
-        }
+
+        accelerations[i] = acc;
+    }
+}
+
+} // namespace
+
+void simulationStepBrutForceCPU(std::vector<Object>& objs, double dt, bool pause) {
+    if (pause || objs.empty()) {
+        return;
+    }
+
+    const size_t n = objs.size();
+
+    // Reused work buffers to minimize per-step allocations.
+    static std::vector<double> masses;
+    static std::vector<glm::dvec3> pos0;
+    static std::vector<glm::dvec3> vel0;
+    static std::vector<glm::dvec3> tmpPos;
+    static std::vector<glm::dvec3> k1x, k2x, k3x, k4x;
+    static std::vector<glm::dvec3> k1v, k2v, k3v, k4v;
+
+    masses.resize(n);
+    pos0.resize(n);
+    vel0.resize(n);
+    tmpPos.resize(n);
+    k1x.resize(n);
+    k2x.resize(n);
+    k3x.resize(n);
+    k4x.resize(n);
+    k1v.resize(n);
+    k2v.resize(n);
+    k3v.resize(n);
+    k4v.resize(n);
+
+    for (size_t i = 0; i < n; ++i) {
+        masses[i] = objs[i].mass;
+        pos0[i] = objs[i].position;
+        vel0[i] = objs[i].velocity;
+    }
+
+    // k1
+    computeAccelerations(pos0, masses, k1v);
+    for (size_t i = 0; i < n; ++i) {
+        k1x[i] = vel0[i];
+        tmpPos[i] = pos0[i] + 0.5 * dt * k1x[i];
+    }
+
+    // k2
+    computeAccelerations(tmpPos, masses, k2v);
+    for (size_t i = 0; i < n; ++i) {
+        k2x[i] = vel0[i] + 0.5 * dt * k1v[i];
+        tmpPos[i] = pos0[i] + 0.5 * dt * k2x[i];
+    }
+
+    // k3
+    computeAccelerations(tmpPos, masses, k3v);
+    for (size_t i = 0; i < n; ++i) {
+        k3x[i] = vel0[i] + 0.5 * dt * k2v[i];
+        tmpPos[i] = pos0[i] + dt * k3x[i];
+    }
+
+    // k4
+    computeAccelerations(tmpPos, masses, k4v);
+    for (size_t i = 0; i < n; ++i) {
+        k4x[i] = vel0[i] + dt * k3v[i];
+    }
+
+    const double w = dt / 6.0;
+    for (size_t i = 0; i < n; ++i) {
+        objs[i].position = pos0[i] + w * (k1x[i] + 2.0 * k2x[i] + 2.0 * k3x[i] + k4x[i]);
+        objs[i].velocity = vel0[i] + w * (k1v[i] + 2.0 * k2v[i] + 2.0 * k3v[i] + k4v[i]);
     }
 }

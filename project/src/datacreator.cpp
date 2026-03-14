@@ -8,6 +8,7 @@
 #include <algorithm>
 #include "H5Cpp.h"
 #include "object.hpp"
+#include "physics.hpp"
 using namespace H5;
 namespace fs = std::filesystem;
 struct Particle {
@@ -21,9 +22,8 @@ std::vector<Object> objs = {};
 double initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 
 static inline double radiusFromMassDensity(double m, double rho) {
-    constexpr double pi = 3.14159265358979323846;
-    const double r_m = std::cbrt((3.0 * m) / (4.0 * pi * rho));
-    return r_m / 100000.0;
+    const double r_m = std::cbrt((3.0 * m) / (4.0 * physics::PI * rho));
+    return r_m;
 }
 
 
@@ -129,10 +129,11 @@ int main(int argc, char* argv[]) {
 
     while (inFile >> px >> py >> pz >> vx >> vy >> vz >> m >> r) {
         Particle p;
-        p.position = glm::dvec3(px, py, pz);
-        p.velocity = glm::dvec3(vx, vy, vz);
-        p.mass = m;
-        p.radius = r;
+        // Input is assumed to be in SI units (m, m/s, kg, m); store only normalized units.
+        p.position = glm::dvec3(px, py, pz) * physics::METERS_TO_AU;
+        p.velocity = glm::dvec3(vx, vy, vz) * physics::VELOCITY_TO_AU_PER_YEAR;
+        p.mass = m * physics::MASS_TO_SOLAR;
+        p.radius = r * physics::METERS_TO_AU;
         parts.push_back(p);
     }
 
@@ -158,7 +159,6 @@ int main(int argc, char* argv[]) {
 
     return 0;
 }
-
 
 
 
