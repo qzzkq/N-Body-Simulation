@@ -4,6 +4,7 @@
 #include <algorithm>
 #include "object.hpp"
 #include "barnes_hut.hpp"
+#include "physics.hpp"
 struct OctreeNode {
     double mass;
     double cx, cy, cz;
@@ -19,8 +20,8 @@ struct OctreeNode {
     }
 };
 
-static constexpr double G_KM = 6.6743e-20; // км^3 / (кг·с^2)
 static constexpr double THETA = 0.5;
+static constexpr double SOFTENING_AU = 1.0e6 * physics::METERS_TO_AU; // 1000 km
 
 static int getOctant(const OctreeNode* node, double x, double y, double z) {
     double mx = node->x0 + node->size * 0.5;
@@ -104,11 +105,11 @@ static void accumulateAccel(const Object& obj, const OctreeNode* node,
         double dx = node->cx - px;
         double dy = node->cy - py;
         double dz = node->cz - pz;
-        double r2 = dx*dx + dy*dy + dz*dz;
+        double r2 = dx*dx + dy*dy + dz*dz + SOFTENING_AU * SOFTENING_AU;
         if (r2 == 0.0) return;
         double invR = 1.0 / std::sqrt(r2);
         double invR3 = invR * invR * invR;
-        double f = G_KM * node->mass * invR3;
+        double f = physics::G * node->mass * invR3;
         ax += f * dx;
         ay += f * dy;
         az += f * dz;
@@ -118,14 +119,14 @@ static void accumulateAccel(const Object& obj, const OctreeNode* node,
     double dx = node->cx - px;
     double dy = node->cy - py;
     double dz = node->cz - pz;
-    double r2 = dx*dx + dy*dy + dz*dz;
+    double r2 = dx*dx + dy*dy + dz*dz + SOFTENING_AU * SOFTENING_AU;
     if (r2 == 0.0) return;
     double r = std::sqrt(r2);
 
     if ((node->size / r) < THETA) {
         double invR = 1.0 / r;
         double invR3 = invR * invR * invR;
-        double f = G_KM * node->mass * invR3;
+        double f = physics::G * node->mass * invR3;
         ax += f * dx;
         ay += f * dy;
         az += f * dz;
@@ -145,53 +146,48 @@ static void deleteTree(OctreeNode* node) {
     delete node;
 }
 
-void simulationStepBarnesHutCPU(std::vector<Object>& objs, float dt, bool pause, int iterations) {
+void simulationStepBarnesHutCPU(std::vector<Object>& objs, double dt, bool pause) {
     if (pause || objs.empty()) return;
-    for (int iter = 0; iter < iterations; ++iter) {
-        auto p0 = objs[0].GetPos();
-        double minX = p0.x, maxX = p0.x;
-        double minY = p0.y, maxY = p0.y;
-        double minZ = p0.z, maxZ = p0.z;
+    auto p0 = objs[0].GetPos();
+    double minX = p0.x, maxX = p0.x;
+    double minY = p0.y, maxY = p0.y;
+    double minZ = p0.z, maxZ = p0.z;
 
-        for (const auto& o : objs) {
-            auto p = o.GetPos();
-            if (p.x < minX) minX = p.x;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.y > maxY) maxY = p.y;
-            if (p.z < minZ) minZ = p.z;
-            if (p.z > maxZ) maxZ = p.z;
-        }
-
-        double spanX = maxX - minX;
-        double spanY = maxY - minY;
-        double spanZ = maxZ - minZ;
-        double side = std::max({spanX, spanY, spanZ});
-        if (side <= 0.0) side = 1.0;
-
-        double cx = 0.5 * (minX + maxX);
-        double cy = 0.5 * (minY + maxY);
-        double cz = 0.5 * (minZ + maxZ);
-
-        OctreeNode* root = new OctreeNode(cx - side * 0.5,
-                                            cy - side * 0.5,
-                                            cz - side * 0.5,
-                                            side);
-
-        for (auto& o : objs) insertBody(root, &o);
-        computeMass(root);
-
-        for (auto& o : objs) {
-            auto p = o.GetPos();
-            double ax = 0.0, ay = 0.0, az = 0.0;
-            accumulateAccel(o, root, p.x, p.y, p.z, ax, ay, az);
-            o.accelerate(static_cast<float>(ax),
-                            static_cast<float>(ay),
-                            static_cast<float>(az),
-                            dt);
-            o.UpdatePos(dt);
-        }
-
-        deleteTree(root);
+    for (const auto& o : objs) {
+        auto p = o.GetPos();
+        if (p.x < minX) minX = p.x;
+        if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y;
+        if (p.y > maxY) maxY = p.y;
+        if (p.z < minZ) minZ = p.z;
+        if (p.z > maxZ) maxZ = p.z;
     }
+
+    double spanX = maxX - minX;
+    double spanY = maxY - minY;
+    double spanZ = maxZ - minZ;
+    double side = std::max({spanX, spanY, spanZ});
+    if (side <= 0.0) side = 1.0;
+
+    double cx = 0.5 * (minX + maxX);
+    double cy = 0.5 * (minY + maxY);
+    double cz = 0.5 * (minZ + maxZ);
+
+    OctreeNode* root = new OctreeNode(cx - side * 0.5,
+                                        cy - side * 0.5,
+                                        cz - side * 0.5,
+                                        side);
+
+    for (auto& o : objs) insertBody(root, &o);
+    computeMass(root);
+
+    for (auto& o : objs) {
+        auto p = o.GetPos();
+        double ax = 0.0, ay = 0.0, az = 0.0;
+        accumulateAccel(o, root, p.x, p.y, p.z, ax, ay, az);
+        o.accelerate(ax, ay, az, dt);
+        o.UpdatePos(dt);
+    }
+
+    deleteTree(root);
 }

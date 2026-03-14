@@ -52,6 +52,8 @@ static ArrayType GetPosType() {
     return ArrayType(PredType::NATIVE_DOUBLE, 1, v3dims);
 }
 
+
+const int INTERPOLATION_STEPS = 10;
 int main(int argc, char** argv) {
 
     Camera cam; 
@@ -80,12 +82,12 @@ int main(int argc, char** argv) {
 
     hsize_t numBodiesH5 = 0;
     hsize_t numFramesH5 = 0;
-    double fileDt = 1.0/10;
+    double fixedDt = 1.0f/60;
 
     try {
         file.openAttribute("num_bodies").read(PredType::NATIVE_HSIZE, &numBodiesH5);
         file.openAttribute("num_frames").read(PredType::NATIVE_HSIZE, &numFramesH5);
-        file.openAttribute("dt").read(PredType::NATIVE_DOUBLE, &fileDt);
+        file.openAttribute("dt").read(PredType::NATIVE_DOUBLE, &fixedDt);
     } catch (...) {
         std::cerr << "Error File header missing.\n";
         return 1;
@@ -97,7 +99,7 @@ int main(int argc, char** argv) {
     std::cout << "Opened: " << fileName << "\n"
               << "  Bodies: " << numBodies << "\n"
               << "  Frames: " << numFrames << "\n"
-              << "  DT: " << fileDt << " s\n";
+              << "  DT: " << fixedDt << " s\n";
 
     if (numBodies == 0 || numFrames == 0) return 1;
 
@@ -147,16 +149,18 @@ int main(int argc, char** argv) {
     control.attach();
 
     double playbackTime = 0.0;
-    double maxTime = (numFrames - 1) * fileDt;
+    double maxTime = (numFrames - 1) * fixedDt; 
 
     double lastRealTime = glfwGetTime();
 
-    size_t currentFrameIdx = 0;
+    size_t frameA = 0;
     size_t lastReadFrameIdx = 99999999999;
     size_t pageNumber = 0;
     
-    std::vector<glm::dvec3> posBuffer(numBodies);
-
+    std::vector<glm::dvec3> posBufferA(numBodies);
+    std::vector<glm::dvec3> posBufferB(numBodies);
+    std::vector<glm::dvec3> targetPosition(numBodies);
+    double ratio;
     while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
         double now = glfwGetTime();
         double realDt = now - lastRealTime;
@@ -169,43 +173,53 @@ int main(int argc, char** argv) {
 
         if (playbackTime > maxTime) playbackTime = 0.0;
         if (playbackTime < 0.0) playbackTime = maxTime;
+        ratio = playbackTime / fixedDt;
+        frameA = (size_t)ratio;
+        size_t frameB = frameA + 1;
+        if (frameA >= numFrames) frameA = numFrames - 1;
+        if (frameB >= numFrames) frameB = numFrames - 1;
 
-        currentFrameIdx = (size_t)(playbackTime / fileDt);
-        if (currentFrameIdx >= numFrames) currentFrameIdx = numFrames - 1;
-
-        if (currentFrameIdx != lastReadFrameIdx) {
-
-            if (currentFrameIdx < lastReadFrameIdx && lastReadFrameIdx != 99999999999) {
-                for (auto& obj : objs) {
-                    obj.trail.clear(); 
-                }
+        if (frameA < lastReadFrameIdx && lastReadFrameIdx != 99999999999) {
+            for (auto& obj : objs) {
+                obj.trail.clear(); 
             }
+        }
 
-            hsize_t offset[2] = { static_cast<hsize_t>(currentFrameIdx), 0 };
-            hsize_t count[2]  = { 1, static_cast<hsize_t>(numBodies) };
-            
-            DataSpace fileSpace = tracksSet.getSpace();
-            fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
-
+        if (lastReadFrameIdx != frameA) {
+            hsize_t count[2] = { 1, static_cast<hsize_t>(numBodies) };
             hsize_t memDims[2] = { 1, static_cast<hsize_t>(numBodies) };
             DataSpace memSpace(2, memDims);
 
-            tracksSet.read(posBuffer.data(), GetPosType(), memSpace, fileSpace);
+            hsize_t offsetA[2] = { static_cast<hsize_t>(frameA), 0 };
+            DataSpace fileSpaceA = tracksSet.getSpace();
+            fileSpaceA.selectHyperslab(H5S_SELECT_SET, count, offsetA);
+            tracksSet.read(posBufferA.data(), GetPosType(), memSpace, fileSpaceA);
 
-            for (size_t i = 0; i < numBodies; ++i) {
-                objs[i].position = posBuffer[i];
-            }
-
-            for(auto& obj : objs) obj.updateTrail(); 
-
-            lastReadFrameIdx = currentFrameIdx;
+            hsize_t offsetB[2] = { static_cast<hsize_t>(frameB), 0 };
+            DataSpace fileSpaceB = tracksSet.getSpace();
+            fileSpaceB.selectHyperslab(H5S_SELECT_SET, count, offsetB);
+            tracksSet.read(posBufferB.data(), GetPosType(), memSpace, fileSpaceB);
         }
 
-        renderer.renderFrame(objs, cam); 
+        //std::vector<glm::dvec3> targetPosition = glm::mix(posBufferA, posBufferB, (float)(ratio - frameA) / (float)(frameB - frameA));
+
+        for (size_t i = 0; i < numBodies; ++i) {
+            targetPosition[i] = glm::mix(posBufferA[i], posBufferB[i], (float)(ratio - frameA));
+        }
+
+        for (size_t i = 0; i < numBodies; ++i) {
+            objs[i].position = targetPosition[i];
+        }
+
+        // for(auto& obj : objs) obj.updateTrail(); 
+
+        lastReadFrameIdx = frameA;
+
+    renderer.renderFrame(objs, cam); 
 
         std::snprintf(title, sizeof(title),
                       "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
-                      playbackTime, maxTime, currentFrameIdx, state.timeScale);
+                      playbackTime, maxTime, frameA, state.timeScale);
         glfwSetWindowTitle(renderer.getWindow(), title);
         glfwPollEvents();
     }
