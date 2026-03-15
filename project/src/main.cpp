@@ -246,7 +246,7 @@ if (!loaded) {
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
-                // for(auto& obj : objs) obj.updateTrail();
+                for(auto& obj : objs) obj.updateTrail();
             }
 
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
