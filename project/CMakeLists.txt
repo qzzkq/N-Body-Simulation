@@ -45,8 +45,8 @@ set(CORE_SRC
     src/data.cpp
     src/physics.cpp
     src/generators.cpp
-    src/barnes_hut.cpp
-    src/brut_force.cpp
+    algo/barnes_hut.cpp
+    algo/brut_force.cpp
     ${CUDA_SOURCES}
 ) 
 
@@ -54,6 +54,7 @@ add_library(Core STATIC ${CORE_SRC})
 
 target_include_directories(Core PUBLIC
     include
+    algo
     src
     ${HDF5_INCLUDE_DIRS}
     ${GLEW_INCLUDE_DIRS}
