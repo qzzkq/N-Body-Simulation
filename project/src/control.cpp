@@ -37,7 +37,7 @@ void Control::attach() {
 }
 
 void Control::onKey(int key, int /*scancode*/, int action, int mods) {
-    float cameraSpeed = 1000.0f * state_.deltaTime;
+    float cameraSpeed = 25.0f * state_.deltaTime;
     bool shiftPressed = (mods & GLFW_MOD_SHIFT) != 0;
 
     // Камера WASD + Space/Shift
@@ -92,7 +92,7 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
 }
 
 void Control::onScroll(double /*xoffset*/, double yoffset) {
-    float cameraSpeed = 5000.0f * state_.deltaTime;
+    float cameraSpeed = 100.0f * state_.deltaTime;
     if (yoffset > 0)      camera_.pos += cameraSpeed *  camera_.front;
     else if (yoffset < 0) camera_.pos -= cameraSpeed *  camera_.front;
 }

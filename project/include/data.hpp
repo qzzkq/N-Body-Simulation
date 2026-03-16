@@ -34,4 +34,10 @@ bool LoadObjectsFromFile(const std::string& filePath,
                          const std::string& dsetName,
                          std::vector<Object>& outObjs);
 
+bool LoadSystemFromTextFile(const std::string& filePath,
+                            std::vector<Object>& outObjs);
+
+bool SaveSystemToTextFile(const std::string& filePath,
+                          const std::vector<Object>& objs);
+
 #endif

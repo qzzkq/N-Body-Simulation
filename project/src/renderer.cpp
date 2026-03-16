@@ -105,47 +105,36 @@ void Renderer::updateView(const Camera& camera)
 void Renderer::drawObjects(const std::vector<Object>& objs) const {
     glUseProgram(program_);
 
-    // Выбираем отрисовку в зависимости от режима 
-    if (mode_ == RenderMode::Points) {
-        glPointSize(4.0f);
-        glBindVertexArray(pointVAO_);
-        for (const auto& obj : objs) {
-             glm::mat4 M(1.0f);
-             M = glm::translate(M, glm::vec3(obj.position));
-             glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-             glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-             glDrawArrays(GL_POINTS, 0, 1);
-        }
-        glBindVertexArray(0);
-    }
-    else if (mode_ == RenderMode::Cubes) {
-        glBindVertexArray(cubeVAO_);
+    // Pass 1: true-scale geometry pass (strict 1:1 physical radius)
+    if (mode_ == RenderMode::Cubes || mode_ == RenderMode::Sphere) {
+        const bool drawCubes = (mode_ == RenderMode::Cubes);
+        const GLsizei vertexCount = drawCubes ? 36 : static_cast<GLsizei>(sphereVertexCount_);
+
+        glBindVertexArray(drawCubes ? cubeVAO_ : sphereVAO_);
         for (const auto& obj : objs) {
             glm::mat4 M(1.0f);
             M = glm::translate(M, glm::vec3(obj.position));
-            float scale = std::max(obj.radius, 0.001f);
-            M = glm::scale(M, glm::vec3(scale));
-            
+            M = glm::scale(M, glm::vec3(obj.radius));
+
             glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
             glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-            glDrawArrays(GL_TRIANGLES, 0, 36);
+            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
         }
         glBindVertexArray(0);
     }
-    else { 
-        glBindVertexArray(sphereVAO_);
-        for (const auto& obj : objs) {
-            glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(obj.position));
-            float scale = std::max(obj.radius, 0.1f);
-            M = glm::scale(M, glm::vec3(scale));
-            
-            glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-            glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-            glDrawArrays(GL_TRIANGLES, 0, (GLsizei)sphereVertexCount_);
-        }
-        glBindVertexArray(0);
+
+    // Pass 2: screen-space point markers
+    glPointSize(3.0f);
+    glBindVertexArray(pointVAO_);
+    for (const auto& obj : objs) {
+        glm::mat4 M(1.0f);
+        M = glm::translate(M, glm::vec3(obj.position));
+
+        glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
+        glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
+        glDrawArrays(GL_POINTS, 0, 1);
     }
+    glBindVertexArray(0);
 }
 
 void Renderer::resizeWindow(int w, int h) {
@@ -179,10 +168,7 @@ void Renderer::drawTrails(const std::vector<Object>& objs) const {
     for (const auto& obj : objs) {
         if (obj.trail.size() < 2) continue;
 
-        std::vector<glm::vec3> points(obj.trail.begin(), obj.trail.end());
-        points.push_back(obj.position); 
-
-        glBufferData(GL_ARRAY_BUFFER, points.size() * sizeof(glm::vec3), points.data(), GL_DYNAMIC_DRAW);
+        glBufferData(GL_ARRAY_BUFFER, obj.trail.size() * sizeof(glm::vec3), obj.trail.data(), GL_DYNAMIC_DRAW);
         
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
         glEnableVertexAttribArray(0);
@@ -191,7 +177,7 @@ void Renderer::drawTrails(const std::vector<Object>& objs) const {
         trailColor.a = 0.5f; 
         glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
 
-        glDrawArrays(GL_LINE_STRIP, 0, points.size());
+        glDrawArrays(GL_LINE_STRIP, 0, obj.trail.size());
     }
     glBindVertexArray(0);
 }

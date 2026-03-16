@@ -5,9 +5,9 @@
 #include <random>
 #include <algorithm>
 
-static inline float CalcRadiusKm(double m, double rho) {
-    const double r_m = std::cbrt((3.0 * m) / (4.0 * 3.14159265358979323846 * rho));
-    return static_cast<float>(r_m / 50000.0);
+static inline float CalcRadiusAU(double m) {
+    const double clampedMass = std::max(m, 1e-12);
+    return static_cast<float>(0.02 * std::cbrt(clampedMass));
 }
 
 class RingScenario : public IScenario {
@@ -22,7 +22,7 @@ public:
 
         Object center(glm::vec3(0), glm::vec3(0), p.centralMass, 141000.0f, std::nullopt);
         center.Initalizing = false;
-        center.radius = CalcRadiusKm(center.mass, center.density);
+        center.radius = CalcRadiusAU(center.mass);
         out.push_back(center);
 
         if (p.count <= 0) return;
@@ -50,13 +50,11 @@ public:
             glm::vec3 tdir(-std::sin(a), 0.0f, std::cos(a));
 
             double dist = std::sqrt(static_cast<double>(r*r) + static_cast<double>(y*y));
-            double v_circ_mps = std::sqrt((physics::G * p.centralMass) / (dist * 1000.0));
+            double v_circ_au_per_year = std::sqrt((physics::G * p.centralMass) / std::max(dist, 1e-9));
 
-            float v_kmps = static_cast<float>(v_circ_mps / 1000.0f) * 1.0f;
-
-            Object o(pos, tdir * v_kmps, p.baseMass, 1410.0f, std::nullopt);
+            Object o(pos, tdir * static_cast<float>(v_circ_au_per_year), p.baseMass, 1410.0f, std::nullopt);
             o.Initalizing = false;
-            o.radius = CalcRadiusKm(o.mass, o.density);
+            o.radius = CalcRadiusAU(o.mass);
 
             out.push_back(std::move(o));
         }
@@ -77,7 +75,7 @@ public:
 
         Object center(glm::vec3(0), glm::vec3(0), p.centralMass, 141000.0f, std::nullopt);
         center.Initalizing = false;
-        center.radius = CalcRadiusKm(center.mass, center.density);
+        center.radius = CalcRadiusAU(center.mass);
         out.push_back(center);
 
         if (p.count <= 0) return;
@@ -114,12 +112,11 @@ public:
             float angle = std::atan2(pos.z, pos.x);
             glm::vec3 tdir(-std::sin(angle), 0.0f, std::cos(angle));
 
-            double v_circ_mps = std::sqrt((physics::G * p.centralMass) / (dist * 1000.0));
-            float v_kmps = static_cast<float>(v_circ_mps / 1000.0f) * 1.0f;
+            double v_circ_au_per_year = std::sqrt((physics::G * p.centralMass) / std::max(dist, 1e-9));
 
-            Object o(pos, tdir * v_kmps, p.baseMass, 1410.0f, std::nullopt);
+            Object o(pos, tdir * static_cast<float>(v_circ_au_per_year), p.baseMass, 1410.0f, std::nullopt);
             o.Initalizing = false;
-            o.radius = CalcRadiusKm(o.mass, o.density);
+            o.radius = CalcRadiusAU(o.mass);
 
             out.push_back(std::move(o));
         }

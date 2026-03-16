@@ -2,6 +2,30 @@
 
 namespace physics {
 
+double calculateTotalEnergy(const std::vector<Object>& objs) {
+    if (objs.empty()) return 0.0;
+
+    double kinetic = 0.0;
+    for (const auto& obj : objs) {
+        const double v2 = glm::dot(obj.velocity, obj.velocity);
+        kinetic += 0.5 * obj.mass * v2;
+    }
+
+    double potential = 0.0;
+    const double eps2 = SOFTENING_AU * SOFTENING_AU;
+
+    for (std::size_t i = 0; i < objs.size(); ++i) {
+        for (std::size_t j = i + 1; j < objs.size(); ++j) {
+            const glm::dvec3 delta = objs[j].position - objs[i].position;
+            const double r = std::sqrt(glm::dot(delta, delta) + eps2);
+            if (r <= 0.0) continue;
+            potential += -G * objs[i].mass * objs[j].mass / r;
+        }
+    }
+
+    return kinetic + potential;
+}
+
 void colorFromMass(std::vector<Object>& objs) {
     if (objs.empty()) return;
 

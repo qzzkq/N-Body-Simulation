@@ -1,10 +1,14 @@
 #include "data.hpp"
 #include "object.hpp"
+#include "physics.hpp"
 
 #include <vector>
 #include <string>
 #include <iostream>
 #include <filesystem>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
 #include <cmath>
 #include <algorithm>
 #include <stdexcept>
@@ -154,14 +158,146 @@ bool LoadObjectsFromFile(const std::string& filePath,
             o.radius = static_cast<float>(p.radius);
         } else {
             if (o.density > 0.0) {
-                constexpr double pi = 3.14159265358979323846;
-                const double r_m = std::cbrt((3.0 * o.mass) / (4.0 * pi * o.density));
-                o.radius = static_cast<float>(r_m / 100000.0);
+                o.radius = physics::calculateRadius(o.mass, o.density);
             } else {
                 o.radius = 1.0f;
             }
         }
         outObjs.push_back(std::move(o));
+    }
+
+    return true;
+}
+
+bool LoadSystemFromTextFile(const std::string& filePath,
+                            std::vector<Object>& outObjs)
+{
+    std::ifstream in(filePath);
+    if (!in.is_open()) {
+        std::cerr << "LoadSystemFromTextFile: cannot open file: " << filePath << "\n";
+        return false;
+    }
+
+    outObjs.clear();
+
+    std::string line;
+    std::size_t lineNo = 0;
+    while (std::getline(in, line)) {
+        ++lineNo;
+
+        const auto commentPos = line.find('#');
+        if (commentPos != std::string::npos) {
+            line = line.substr(0, commentPos);
+        }
+
+        auto first = line.find_first_not_of(" \t\r\n");
+        if (first == std::string::npos) {
+            continue;
+        }
+        auto last = line.find_last_not_of(" \t\r\n");
+        line = line.substr(first, last - first + 1);
+
+        std::istringstream iss(line);
+        std::string name;
+        double massKg = 0.0;
+        double density = 0.0;
+        double px = 0.0, py = 0.0, pz = 0.0;
+        double vx = 0.0, vy = 0.0, vz = 0.0;
+        double cr = 1.0, cg = 1.0, cb = 1.0;
+
+        if (!(iss >> name >> massKg >> density
+                  >> px >> py >> pz
+                  >> vx >> vy >> vz
+                  >> cr >> cg >> cb)) {
+            std::cerr << "LoadSystemFromTextFile: invalid format at line " << lineNo
+                      << " in file " << filePath << "\n";
+            outObjs.clear();
+            return false;
+        }
+
+        std::string extra;
+        if (iss >> extra) {
+            std::cerr << "LoadSystemFromTextFile: unexpected trailing token at line "
+                      << lineNo << " in file " << filePath << "\n";
+            outObjs.clear();
+            return false;
+        }
+
+        const double massSolar = massKg * physics::MASS_TO_SOLAR;
+        const glm::dvec3 posAu(px, py, pz);
+        const glm::dvec3 velAuYear(vx, vy, vz);
+
+        Object o(posAu * physics::METERS_TO_AU,
+                 velAuYear * physics::VELOCITY_TO_AU_PER_YEAR,
+                 massSolar,
+                 density,
+                 std::nullopt);
+
+        o.name = name;
+        o.Initalizing = false;
+        o.radius = physics::calculateRadius(o.mass, o.density);
+
+        if (cr > 1.0 || cg > 1.0 || cb > 1.0) {
+            cr /= 255.0;
+            cg /= 255.0;
+            cb /= 255.0;
+        }
+        o.color = glm::vec4(
+            static_cast<float>(std::clamp(cr, 0.0, 1.0)),
+            static_cast<float>(std::clamp(cg, 0.0, 1.0)),
+            static_cast<float>(std::clamp(cb, 0.0, 1.0)),
+            1.0f
+        );
+
+        outObjs.push_back(std::move(o));
+    }
+
+    if (outObjs.empty()) {
+        std::cerr << "LoadSystemFromTextFile: no objects parsed from file: " << filePath << "\n";
+        return false;
+    }
+
+    return true;
+}
+
+bool SaveSystemToTextFile(const std::string& filePath,
+                          const std::vector<Object>& objs)
+{
+    std::ofstream out(filePath);
+    if (!out.is_open()) {
+        std::cerr << "SaveSystemToTextFile: cannot open file: " << filePath << "\n";
+        return false;
+    }
+
+    out << std::scientific << std::setprecision(15);
+    out << "# Format: Name Mass_kg Density_kg_m3 PosX_m PosY_m PosZ_m VelX_ms VelY_ms VelZ_ms Color_R Color_G Color_B\n";
+
+    for (std::size_t i = 0; i < objs.size(); ++i) {
+        const Object& obj = objs[i];
+
+        const std::string name = !obj.name.empty()
+            ? obj.name
+            : ("Body_" + std::to_string(i));
+
+        const double massKg = obj.mass / physics::MASS_TO_SOLAR;
+        const glm::dvec3 posM = obj.position / physics::METERS_TO_AU;
+        const glm::dvec3 velMs = obj.velocity / physics::VELOCITY_TO_AU_PER_YEAR;
+
+        const int r = static_cast<int>(std::clamp(obj.color.r, 0.0f, 1.0f) * 255.0f);
+        const int g = static_cast<int>(std::clamp(obj.color.g, 0.0f, 1.0f) * 255.0f);
+        const int b = static_cast<int>(std::clamp(obj.color.b, 0.0f, 1.0f) * 255.0f);
+
+        out << name << ' '
+            << massKg << ' '
+            << obj.density << ' '
+            << posM.x << ' ' << posM.y << ' ' << posM.z << ' '
+            << velMs.x << ' ' << velMs.y << ' ' << velMs.z << ' '
+            << r << ' ' << g << ' ' << b << '\n';
+
+        if (!out.good()) {
+            std::cerr << "SaveSystemToTextFile: write error for file: " << filePath << "\n";
+            return false;
+        }
     }
 
     return true;
