@@ -184,9 +184,18 @@ static CompType GetInitType() {
     return t;
 }
 
-static ArrayType GetPosType() {
+struct PosVelRecord {
+    glm::dvec3 position;
+    glm::dvec3 velocity;
+};
+
+static CompType GetPosVelType() {
     hsize_t v3dims[1] = {3};
-    return ArrayType(PredType::NATIVE_DOUBLE, 1, v3dims);
+    ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+    CompType t(sizeof(PosVelRecord));
+    t.insertMember("position", HOFFSET(PosVelRecord, position), vec3Type);
+    t.insertMember("velocity", HOFFSET(PosVelRecord, velocity), vec3Type);
+    return t;
 }
 
 H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodies, double dt)
@@ -220,7 +229,7 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
 
         DSetCreatPropList prop;
         hsize_t timeStepsInChunk = 1;
-        size_t frameSize = nb * 3 * sizeof(double);
+        size_t frameSize = nb * 6 * sizeof(double);
         if (frameSize > 0) {
              timeStepsInChunk = 262144 / frameSize;
              if (timeStepsInChunk < 1) timeStepsInChunk = 1;
@@ -231,7 +240,7 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
         prop.setShuffle(); 
         prop.setDeflate(6);
 
-        file.createDataSet("tracks", GetPosType(), tracksSpace, prop);
+        file.createDataSet("tracks", GetPosVelType(), tracksSpace, prop);
     }
 
     file.flush(H5F_SCOPE_GLOBAL);
@@ -264,15 +273,16 @@ void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std
     hsize_t count[2]  = { 1, numBodies };
     fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 
-    std::vector<glm::dvec3> positions(objs.size());
+    std::vector<PosVelRecord> posvels(objs.size());
     for (size_t i = 0; i < objs.size(); ++i) {
-        positions[i] = objs[i].position;
+        posvels[i].position = objs[i].position;
+        posvels[i].velocity = objs[i].velocity;
     }
 
     hsize_t memDims[2] = { 1, numBodies };
     DataSpace memSpace(2, memDims);
 
-    dset.write(positions.data(), GetPosType(), memSpace, fileSpace);
+    dset.write(posvels.data(), GetPosVelType(), memSpace, fileSpace);
 }
 
 void CloseSimulationFile(H5::H5File& file, std::size_t totalFrames)

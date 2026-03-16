@@ -37,7 +37,7 @@
 
 double gSimTime = 0.0;
 float fixedDt = 1.0f/60; // шаг времени;
-const int FIXED_STEPS = 10;
+const int FIXED_STEPS = 100;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
@@ -173,7 +173,10 @@ if (!loaded) {
         }
     }
 
-    H5::H5File framesFile = CreateSimulationFile("data/frames.h5", objs.size(), fixedDt * static_cast<double>(FIXED_STEPS));
+    std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
+    std::string filename;
+    std::cin >> filename;
+    H5::H5File framesFile = CreateSimulationFile("data/" + filename + ".h5", objs.size(), fixedDt * FIXED_STEPS);
     std::size_t frameIndex = 0;
     WriteSimulationFrame(framesFile, objs, frameIndex);
     ++frameIndex;
@@ -247,12 +250,10 @@ if (!loaded) {
         std::cout << "Начинаем расчет..." << std::endl;
 
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime) {
-            simulationStep(objs, fixedDt, false, FIXED_STEPS);
-            gSimTime += fixedDt * FIXED_STEPS;
-            stepCounter += FIXED_STEPS;
-            WriteSimulationFrame(framesFile, objs, frameIndex);
-            ++frameIndex;
-            if (stepCounter % (FIXED_STEPS * 10) == 0) {
+            simulationStep(objs, fixedDt, false, 1);
+            gSimTime += fixedDt;
+            stepCounter += 1;
+            if (stepCounter % (1 * 10) == 0) {
                 glfwPollEvents();
 
                 renderer.renderFrame(objs, cam);
@@ -261,6 +262,10 @@ if (!loaded) {
                       "BAKING... %.1f%% | Time: %.2f / %.2f | Saved: %zu",
                       progress, gSimTime, targetTime, frameIndex);
                 glfwSetWindowTitle(renderer.getWindow(), title);
+            }
+            if (stepCounter % FIXED_STEPS == 0) {
+                WriteSimulationFrame(framesFile, objs, frameIndex);
+                ++frameIndex;
             }
         }
         std::cout << "Расчет завершен за " << (static_cast<int>(time(NULL)) - startTime) << " сек.\n";
