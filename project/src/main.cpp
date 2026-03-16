@@ -38,7 +38,7 @@
 
 double gSimTime = 0.0;
 double fixedDt = 1.0 / 3652.5; // шаг времени;
-const int FIXED_STEPS = 10;
+const int FIXED_STEPS = 100;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 

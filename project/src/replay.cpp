@@ -47,11 +47,19 @@ static CompType GetInitType() {
     return t;
 }
 
-static ArrayType GetPosType() {
-    hsize_t v3dims[1] = {3};
-    return ArrayType(PredType::NATIVE_DOUBLE, 1, v3dims);
-}
+struct PosVelRecord {
+    glm::dvec3 position;
+    glm::dvec3 velocity;
+};
 
+static CompType GetPosVelType() {
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+    CompType t(sizeof(PosVelRecord));
+    t.insertMember("position", HOFFSET(PosVelRecord, position), vec3Type);
+    t.insertMember("velocity", HOFFSET(PosVelRecord, velocity), vec3Type);
+    return t;
+}
 
 const int INTERPOLATION_STEPS = 10;
 int main(int argc, char** argv) {
@@ -156,9 +164,9 @@ int main(int argc, char** argv) {
     size_t frameA = 0;
     size_t lastReadFrameIdx = 99999999999;
     size_t pageNumber = 0;
-    
-    std::vector<glm::dvec3> posBufferA(numBodies);
-    std::vector<glm::dvec3> posBufferB(numBodies);
+
+    std::vector<PosVelRecord> bufferA(numBodies);
+    std::vector<PosVelRecord> bufferB(numBodies);
     std::vector<glm::dvec3> targetPosition(numBodies);
     double ratio;
     while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
@@ -193,18 +201,33 @@ int main(int argc, char** argv) {
             hsize_t offsetA[2] = { static_cast<hsize_t>(frameA), 0 };
             DataSpace fileSpaceA = tracksSet.getSpace();
             fileSpaceA.selectHyperslab(H5S_SELECT_SET, count, offsetA);
-            tracksSet.read(posBufferA.data(), GetPosType(), memSpace, fileSpaceA);
-
+            tracksSet.read(bufferA.data(), GetPosVelType(), memSpace, fileSpaceA);
+            
             hsize_t offsetB[2] = { static_cast<hsize_t>(frameB), 0 };
             DataSpace fileSpaceB = tracksSet.getSpace();
             fileSpaceB.selectHyperslab(H5S_SELECT_SET, count, offsetB);
-            tracksSet.read(posBufferB.data(), GetPosType(), memSpace, fileSpaceB);
+            tracksSet.read(bufferB.data(), GetPosVelType(), memSpace, fileSpaceB);
         }
 
-        //std::vector<glm::dvec3> targetPosition = glm::mix(posBufferA, posBufferB, (float)(ratio - frameA) / (float)(frameB - frameA));
+        double t = ratio - frameA;
+        double t2 = t * t;
+        double t3 = t2 * t;
+
+        double h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
+        double h10 = t3 - 2.0 * t2 + t;
+        double h01 = -2.0 * t3 + 3.0 * t2;
+        double h11 = t3 - t2;
 
         for (size_t i = 0; i < numBodies; ++i) {
-            targetPosition[i] = glm::mix(posBufferA[i], posBufferB[i], (float)(ratio - frameA));
+            glm::dvec3 p0 = bufferA[i].position;
+            glm::dvec3 v0 = bufferA[i].velocity;
+            glm::dvec3 p1 = bufferB[i].position;
+            glm::dvec3 v1 = bufferB[i].velocity;
+
+            targetPosition[i] = p0 * h00 + 
+                                v0 * (h10 * fixedDt) + 
+                                p1 * h01 + 
+                                v1 * (h11 * fixedDt);
         }
 
         for (size_t i = 0; i < numBodies; ++i) {
