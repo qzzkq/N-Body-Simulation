@@ -202,13 +202,12 @@ int main(int argc, char** argv) {
             DataSpace fileSpaceA = tracksSet.getSpace();
             fileSpaceA.selectHyperslab(H5S_SELECT_SET, count, offsetA);
             tracksSet.read(bufferA.data(), GetPosVelType(), memSpace, fileSpaceA);
+            
             hsize_t offsetB[2] = { static_cast<hsize_t>(frameB), 0 };
             DataSpace fileSpaceB = tracksSet.getSpace();
             fileSpaceB.selectHyperslab(H5S_SELECT_SET, count, offsetB);
             tracksSet.read(bufferB.data(), GetPosVelType(), memSpace, fileSpaceB);
         }
-
-        //std::vector<glm::dvec3> targetPosition = glm::mix(posBufferA, posBufferB, (float)(ratio - frameA) / (float)(frameB - frameA));
 
         double t = ratio - frameA;
         double t2 = t * t;
