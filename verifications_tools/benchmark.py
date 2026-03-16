@@ -5,6 +5,7 @@ import os
 import math
 import time
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
 
 try:
     import nasa_api
@@ -56,7 +57,7 @@ def main():
     os.makedirs("data", exist_ok=True)
     input_txt = "data/system_past.txt"
     rebound_txt = "data/rebound_truth.txt"
-    target_years = 1.0
+    target_years = 100.0
 
     print("=== 1. Получение данных от NASA ===")
     nasa_api.fetch_and_save(nasa_api.past_start, nasa_api.past_stop, input_txt)
@@ -66,7 +67,7 @@ def main():
     rebound_positions = read_positions(rebound_txt)
     print(f"Эталон просчитан. Загружено объектов: {len(rebound_positions)}")
 
-    dt_values = [0.01, 0.005, 0.001, 0.0005, 0.0001]
+    dt_values = [1.0, 1.0/365.25, 1.0/3652.5, 1.0/36525.0, 1.0/365250.0]
     errors = []
 
     print("\n=== 3. Запуск C++ программы с разными dt ===")
@@ -103,26 +104,66 @@ def main():
             print("ОШИБКА выполнения!")
             errors.append(None)
 
+    print("\n=== 4. Построение графика ===")
     valid_dt = [dt for dt, err in zip(dt_values, errors) if err is not None]
     valid_err = [err for err in errors if err is not None]
-
-    print("\n=== 4. Построение графика ===")
-    plt.figure(figsize=(9, 6))
-    plt.plot(valid_dt, valid_err, marker='o', linestyle='-', color='b', linewidth=2)
+    
+    plt.figure(figsize=(10, 6))
+    
+    safe_err = [max(e, 1e-10) for e in valid_err]
+    
+    plt.plot(valid_dt, safe_err, marker='o', markersize=8, linestyle='-', color='#1f77b4', linewidth=2)
+    
     plt.xscale('log')
     plt.yscale('log')
+    ax = plt.gca()
+    ax.invert_xaxis()
+    
+    ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda y, pos: f"{y:g}%"))
+    
+    dt_labels = []
+    for dt in valid_dt:
+        if abs(dt - 1.0) < 1e-6: 
+            dt_labels.append("1.0")
+        elif abs(dt - 1.0/365.0) < 1e-6: 
+            dt_labels.append("1/365")
+        elif abs(dt - 1.0/365.25) < 1e-6: 
+            dt_labels.append("1/365.25")
+        elif abs(dt - 1.0/3652.5) < 1e-6: 
+            dt_labels.append("1/3652.5")
+        elif abs(dt - 1.0/36525.0) < 1e-9: 
+            dt_labels.append("1/36525")
+        elif abs(dt - 1.0/365250.0) < 1e-10: 
+            dt_labels.append("1/365250")
+        else: 
+            dt_labels.append(f"{dt:.1e}")
 
-    plt.gca().invert_xaxis()
+    plt.xticks(valid_dt, dt_labels, rotation=0, fontsize=10)
+
+    for x, y in zip(valid_dt, safe_err):
+        if y <= 1e-10:
+            label_text = "0.0%"
+        else:
+            label_text = f"{y:.5f}%" if y > 0.00001 else f"{y:.1e}%"
+            
+        plt.annotate(label_text, (x, y), textcoords="offset points", xytext=(0, 10), 
+                     ha='center', fontsize=9, weight='bold')
+
+    plt.xlabel("Шаг интеграции dt (в годах)", fontsize=12)
+    plt.ylabel("Ср. относительная ошибка позиций", fontsize=12)
+    plt.title("Зависимость точности C++ симуляции от шага dt", fontsize=13)
     
-    plt.xlabel("Шаг интеграции dt (годы)")
-    plt.ylabel("Ср. относительная ошибка позиций (%)")
-    plt.title("Зависимость точности C++ симуляции от шага dt\n(В сравнении с REBOUND IAS15)")
-    plt.grid(True, which="both", ls="--", alpha=0.5)
+    plt.grid(True, which="major", ls="-", color='gray', alpha=0.5)
+    plt.grid(True, which="minor", ls="--", color='gray', alpha=0.2)
     
+
+    plt.margins(y=0.2)
+    
+    plt.tight_layout()
     chart_file = "accuracy_chart.png"
-    plt.savefig(chart_file)
+    plt.savefig(chart_file, dpi=300)
     print(f"График сохранен в файл: {chart_file}")
-    plt.show()
+    plt.show()  
 
 if __name__ == "__main__":
     main()

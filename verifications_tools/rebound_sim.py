@@ -31,7 +31,6 @@ def run_rebound_simulation(input_file, output_file, years_to_simulate):
                 extra_data[name] = (density, r, g, b)
                 particle_names.append(name)
 
-                # Конвертация в IAU
                 m = mass_kg / SOLAR_MASS_KG
                 x, y, z = px / AU_METERS, py / AU_METERS, pz / AU_METERS
                 v_x = vx * (YEAR_SECONDS / AU_METERS)
@@ -42,7 +41,13 @@ def run_rebound_simulation(input_file, output_file, years_to_simulate):
     except FileNotFoundError:
         print(f"Ошибка: Файл {input_file} не найден.")
         return
-
+    
+    com = sim.com()
+    
+    for p in sim.particles:
+        p.vx -= com.vx
+        p.vy -= com.vy
+        p.vz -= com.vz
     print(f"Интегрируем {input_file} на {years_to_simulate} лет...")
     sim.integrate(float(years_to_simulate))
 
@@ -54,7 +59,6 @@ def run_rebound_simulation(input_file, output_file, years_to_simulate):
             name = particle_names[i]
             d, r, g, b = extra_data[name]
             
-            # Обратная конвертация
             f.write(f"{name} {p.m*SOLAR_MASS_KG:.15e} {d:.15e} "
                     f"{p.x*AU_METERS:.15e} {p.y*AU_METERS:.15e} {p.z*AU_METERS:.15e} "
                     f"{p.vx*(AU_METERS/YEAR_SECONDS):.15e} {p.vy*(AU_METERS/YEAR_SECONDS):.15e} {p.vz*(AU_METERS/YEAR_SECONDS):.15e} "
