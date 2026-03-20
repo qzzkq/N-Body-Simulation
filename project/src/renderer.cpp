@@ -4,24 +4,39 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <iostream>
 #include <cmath>
+#include <algorithm>
 
 static const char* VERTEX_SHADER_SOURCE = R"glsl(
 #version 330 core
 layout(location=0) in vec3 aPos;
+layout(location=2) in vec4 iModel0;
+layout(location=3) in vec4 iModel1;
+layout(location=4) in vec4 iModel2;
+layout(location=5) in vec4 iModel3;
+layout(location=6) in vec4 iColor;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
+uniform vec4 objectColor;
+uniform int useInstancing;
+uniform float farPlane;
+out vec4 vColor;
 void main() {
-    gl_Position = projection * view * model * vec4(aPos, 1.0);
+    mat4 instanceMatrix = mat4(iModel0, iModel1, iModel2, iModel3);
+    mat4 M = (useInstancing == 1) ? instanceMatrix : model;
+    vColor = (useInstancing == 1) ? iColor : objectColor;
+    gl_Position = projection * view * M * vec4(aPos, 1.0);
+    float C = 1.0;
+    gl_Position.z = (2.0 * log(C * gl_Position.w + 1.0) / log(C * farPlane + 1.0) - 1.0) * gl_Position.w;
 }
 )glsl";
 
 static const char* FRAGMENT_SHADER_SOURCE = R"glsl(
 #version 330 core
 out vec4 FragColor;
-uniform vec4 objectColor;
+in vec4 vColor;
 void main() {
-    FragColor = objectColor;
+    FragColor = vColor;
 }
 )glsl";
 
@@ -44,6 +59,31 @@ void main() {
 }
 )glsl";
 
+static const char* POINT_VS = R"glsl(
+#version 330 core
+layout(location=0) in vec3 aPos;
+layout(location=1) in vec4 aColor;
+uniform mat4 view;
+uniform mat4 projection;
+uniform float farPlane;
+out vec4 vColor;
+void main() {
+    vColor = aColor;
+    gl_Position = projection * view * vec4(aPos, 1.0);
+    float C = 1.0;
+    gl_Position.z = (2.0 * log(C * gl_Position.w + 1.0) / log(C * farPlane + 1.0) - 1.0) * gl_Position.w;
+}
+)glsl";
+
+static const char* POINT_FS = R"glsl(
+#version 330 core
+in vec4 vColor;
+out vec4 FragColor;
+void main() {
+    FragColor = vColor;
+}
+)glsl";
+
 // перевод сферических координат в декартовы 
 static glm::vec3 sphericalToCartesian(float r, float theta, float phi) {
     return glm::vec3(
@@ -62,8 +102,13 @@ Renderer::~Renderer() {
     if (successInit_) {
         glDeleteVertexArrays(1, &sphereVAO_); glDeleteBuffers(1, &sphereVBO_);
         glDeleteVertexArrays(1, &cubeVAO_);   glDeleteBuffers(1, &cubeVBO_);
-        glDeleteVertexArrays(1, &pointVAO_);  glDeleteBuffers(1, &pointVBO_);
+        glDeleteVertexArrays(1, &pointVAO_);
+        glDeleteBuffers(1, &pointVBO_);
+        glDeleteBuffers(1, &pointColorVBO_);
+        glDeleteBuffers(1, &instanceModelVBO_);
+        glDeleteBuffers(1, &instanceColorVBO_);
         glDeleteProgram(program_);
+        glDeleteProgram(pointProgram_);
     }
 }
 
@@ -90,51 +135,96 @@ void Renderer::setProjection(float fov_deg,
     int width, height;
     glfwGetFramebufferSize(window_, &width, &height);
     float aspect = (float) width / height; 
+    farPlane_ = zfar;
     glUseProgram(program_);
     projectionMatrix_ = glm::perspective(glm::radians(fov_deg), aspect, znear, zfar);
     glUniformMatrix4fv(uProj_, 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
+    glUniform1f(glGetUniformLocation(program_, "farPlane"), farPlane_);
+    glUseProgram(pointProgram_);
+    glUniformMatrix4fv(glGetUniformLocation(pointProgram_, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
+    glUniform1f(glGetUniformLocation(pointProgram_, "farPlane"), farPlane_);
+    glUseProgram(trailProgram_);
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
 }
 
 void Renderer::updateView(const Camera& camera)
 {
-    viewMatrix_ = camera.getViewMatrix(); 
+    // Relative-to-eye рендеринг: translation already baked into model positions.
+    // View matrix contains orientation only.
+    viewMatrix_ = glm::lookAt(glm::vec3(0.0f), camera.front, camera.up);
     glUseProgram(program_);
     glUniformMatrix4fv(uView_, 1, GL_FALSE, glm::value_ptr(viewMatrix_));
+    glUseProgram(pointProgram_);
+    glUniformMatrix4fv(glGetUniformLocation(pointProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
+    glUseProgram(trailProgram_);
+    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
 }
 
-void Renderer::drawObjects(const std::vector<Object>& objs) const {
+void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam) {
     glUseProgram(program_);
 
-    // Pass 1: true-scale geometry pass (strict 1:1 physical radius)
+    if (graphics.size() != objs.size()) return;
+
+    static std::vector<glm::mat4> modelMatrices;
+    static std::vector<glm::vec4> colors;
+    modelMatrices.resize(objs.size());
+    colors.resize(objs.size());
+    for (std::size_t i = 0; i < objs.size(); ++i) {
+        glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
+        float distance = static_cast<float>(glm::length(relativePos));
+        float visualScale = std::max(objs[i].radius, distance * 0.002f);
+        glm::mat4 M(1.0f);
+        M = glm::translate(M, glm::vec3(relativePos));
+        M = glm::scale(M, glm::vec3(visualScale));
+        modelMatrices[i] = M;
+        colors[i] = graphics[i].color;
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
+    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
+    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec4), colors.data(), GL_DYNAMIC_DRAW);
+
+    // Pass 1: instanced geometry pass
     if (mode_ == RenderMode::Cubes || mode_ == RenderMode::Sphere) {
         const bool drawCubes = (mode_ == RenderMode::Cubes);
         const GLsizei vertexCount = drawCubes ? 36 : static_cast<GLsizei>(sphereVertexCount_);
 
+        glUniform1i(uUseInstancing_, 1);
         glBindVertexArray(drawCubes ? cubeVAO_ : sphereVAO_);
-        for (const auto& obj : objs) {
-            glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(obj.position));
-            M = glm::scale(M, glm::vec3(obj.radius));
-
-            glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-            glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-            glDrawArrays(GL_TRIANGLES, 0, vertexCount);
+        if (!objs.empty()) {
+            glDrawArraysInstanced(GL_TRIANGLES, 0, vertexCount, static_cast<GLsizei>(objs.size()));
         }
         glBindVertexArray(0);
     }
 
-    // Pass 2: screen-space point markers
+    // Pass 2: batched point pass (single draw call).
+    static std::vector<glm::vec3> pointPositions;
+    static std::vector<glm::vec4> pointColors;
+    pointPositions.resize(objs.size());
+    pointColors.resize(objs.size());
+    for (std::size_t i = 0; i < objs.size(); ++i) {
+        glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
+        pointPositions[i] = glm::vec3(relativePos);
+        pointColors[i] = colors[i];
+    }
+
+    glUseProgram(pointProgram_);
+
+    glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
+    glBufferData(GL_ARRAY_BUFFER, pointPositions.size() * sizeof(glm::vec3), pointPositions.data(), GL_DYNAMIC_DRAW);
+    glBindBuffer(GL_ARRAY_BUFFER, pointColorVBO_);
+    glBufferData(GL_ARRAY_BUFFER, pointColors.size() * sizeof(glm::vec4), pointColors.data(), GL_DYNAMIC_DRAW);
+
     glPointSize(3.0f);
     glBindVertexArray(pointVAO_);
-    for (const auto& obj : objs) {
-        glm::mat4 M(1.0f);
-        M = glm::translate(M, glm::vec3(obj.position));
-
-        glUniformMatrix4fv(uModel_, 1, GL_FALSE, glm::value_ptr(M));
-        glUniform4f(uColor_, obj.color.r, obj.color.g, obj.color.b, obj.color.a);
-        glDrawArrays(GL_POINTS, 0, 1);
+    if (!objs.empty()) {
+        glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(objs.size()));
     }
     glBindVertexArray(0);
+
+    // Возвращаем основной шейдер как активный для следующего кадра.
+    glUseProgram(program_);
 }
 
 void Renderer::resizeWindow(int w, int h) {
@@ -144,40 +234,48 @@ void Renderer::resizeWindow(int w, int h) {
     glViewport(0, 0, frW, frH);
 }
 
-void Renderer::renderFrame(const std::vector<Object>& objs, const Camera& cam) {
+void Renderer::renderFrame(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam) {
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
     glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
     
     updateView(cam);
     
-    drawTrails(objs);
-    drawObjects(objs);
+    drawTrails(objs, graphics, cam);
+    drawObjects(objs, graphics, cam);
     
     glfwSwapBuffers(window_);
 }
 
-void Renderer::drawTrails(const std::vector<Object>& objs) const {
+void Renderer::drawTrails(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam) {
+    if (graphics.size() != objs.size()) return;
+
     glUseProgram(trailProgram_);
-    
-    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
-    glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "projection"), 1, GL_FALSE, glm::value_ptr(projectionMatrix_));
 
     glBindVertexArray(trailVAO_);
     glBindBuffer(GL_ARRAY_BUFFER, trailVBO_);
 
-    for (const auto& obj : objs) {
-        if (obj.trail.size() < 2) continue;
+    // std::deque не гарантирует непрерывное расположение в памяти, поэтому
+    // перед отправкой в GPU копируем в небольшой временный буфер.
+    static thread_local std::vector<glm::vec3> trailScratch;
+    for (std::size_t i = 0; i < objs.size(); ++i) {
+        const auto& gfx = graphics[i];
+        if (gfx.trail.size() < 2) continue;
 
-        glBufferData(GL_ARRAY_BUFFER, obj.trail.size() * sizeof(glm::vec3), obj.trail.data(), GL_DYNAMIC_DRAW);
+        trailScratch.resize(gfx.trail.size());
+        for (std::size_t j = 0; j < gfx.trail.size(); ++j) {
+            glm::dvec3 relativeTrailPos = glm::dvec3(gfx.trail[j]) - glm::dvec3(cam.pos);
+            trailScratch[j] = glm::vec3(relativeTrailPos);
+        }
+        glBufferData(GL_ARRAY_BUFFER, gfx.trail.size() * sizeof(glm::vec3), trailScratch.data(), GL_DYNAMIC_DRAW);
         
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
         glEnableVertexAttribArray(0);
 
-        glm::vec4 trailColor = obj.color * 0.7f;
+        glm::vec4 trailColor = gfx.color * 0.7f;
         trailColor.a = 0.5f; 
         glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
 
-        glDrawArrays(GL_LINE_STRIP, 0, obj.trail.size());
+        glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(gfx.trail.size()));
     }
     glBindVertexArray(0);
 }
@@ -213,15 +311,24 @@ GLuint Renderer::compileProgram(const char* vs, const char* fs) {
 // Private-методы для инициализации отрисовочных параметров 
 
 void Renderer::initPointGeometry() {
-    // Точка в центре (0,0,0)
-    float pointVert[] = { 0.0f, 0.0f, 0.0f };
     glGenVertexArrays(1, &pointVAO_);
     glGenBuffers(1, &pointVBO_);
+    glGenBuffers(1, &pointColorVBO_);
+
     glBindVertexArray(pointVAO_);
+
+    // Позиции точек мира.
     glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(pointVert), pointVert, GL_STATIC_DRAW);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+
+    // Цвета точек.
+    glBindBuffer(GL_ARRAY_BUFFER, pointColorVBO_);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_DYNAMIC_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+    glEnableVertexAttribArray(1);
+
     glBindVertexArray(0);
 }
 
@@ -254,6 +361,7 @@ void Renderer::initCubeGeometry() {
     glBufferData(GL_ARRAY_BUFFER, sizeof(cubeVerts), cubeVerts, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    setupInstanceAttribs(cubeVAO_);
     glBindVertexArray(0);
 }
 
@@ -297,6 +405,7 @@ void Renderer::initSphereGeometry() {
     
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * sizeof(float), (void*)0);
     glEnableVertexAttribArray(0);
+    setupInstanceAttribs(sphereVAO_);
     glBindVertexArray(0);
 }
 
@@ -369,10 +478,45 @@ bool Renderer::initWindow(int width, int height, const char* title, bool fullscr
 void Renderer::initProgram() {
     program_ = compileProgram(VERTEX_SHADER_SOURCE, FRAGMENT_SHADER_SOURCE);
     trailProgram_ = compileProgram(TRAIL_VS, TRAIL_FS);
+    pointProgram_ = compileProgram(POINT_VS, POINT_FS);
     glUseProgram(program_);
     
     uModel_ = glGetUniformLocation(program_, "model");
     uView_  = glGetUniformLocation(program_, "view");
     uProj_  = glGetUniformLocation(program_, "projection");
     uColor_ = glGetUniformLocation(program_, "objectColor");
+    uUseInstancing_ = glGetUniformLocation(program_, "useInstancing");
+
+    glGenBuffers(1, &instanceModelVBO_);
+    glGenBuffers(1, &instanceColorVBO_);
+    glUniform1f(glGetUniformLocation(program_, "farPlane"), farPlane_);
+
+    glUseProgram(pointProgram_);
+    glUniform1f(glGetUniformLocation(pointProgram_, "farPlane"), farPlane_);
+}
+
+void Renderer::setupInstanceAttribs(GLuint vao) {
+    glBindVertexArray(vao);
+
+    glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
+    constexpr GLsizei matStride = static_cast<GLsizei>(sizeof(glm::mat4));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, matStride, (void*)0);
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(sizeof(glm::vec4)));
+    glEnableVertexAttribArray(4);
+    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(2 * sizeof(glm::vec4)));
+    glEnableVertexAttribArray(5);
+    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(3 * sizeof(glm::vec4)));
+    glVertexAttribDivisor(2, 1);
+    glVertexAttribDivisor(3, 1);
+    glVertexAttribDivisor(4, 1);
+    glVertexAttribDivisor(5, 1);
+
+    glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
+    glEnableVertexAttribArray(6);
+    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
+    glVertexAttribDivisor(6, 1);
+
+    glBindVertexArray(0);
 }

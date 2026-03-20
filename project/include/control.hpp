@@ -15,6 +15,7 @@ public:
             SimState& state);
 
     void attach();
+    void updateCameraFromKeys();
 
 private:
     // Статические обёртки для GLFW
