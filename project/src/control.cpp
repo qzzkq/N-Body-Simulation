@@ -36,28 +36,35 @@ void Control::attach() {
     if (self) self->onCursorPos(x, y);
 }
 
-void Control::onKey(int key, int /*scancode*/, int action, int mods) {
+void Control::updateCameraFromKeys() {
     float cameraSpeed = 25.0f * state_.deltaTime;
-    bool shiftPressed = (mods & GLFW_MOD_SHIFT) != 0;
+    if (cameraSpeed == 0.0f) return;
 
-    // Камера WASD + Space/Shift
+    // Камера WASD + Space/Shift.
+    // Переехало в основной цикл, чтобы не зависеть от частоты событий onKey.
     if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) camera_.pos += cameraSpeed * camera_.front;
     if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.front;
     if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) camera_.pos -= cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
     if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) camera_.pos += cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
-    if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS)      camera_.pos += cameraSpeed * camera_.up;
+    if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS) camera_.pos += cameraSpeed * camera_.up;
     if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.up;
+}
+
+void Control::onKey(int key, int /*scancode*/, int action, int mods) {
+    (void)mods;
 
     // Ускорение/замедление времени
-    if (glfwGetKey(window_, GLFW_KEY_EQUAL)   == GLFW_PRESS) state_.timeScale = std::min(state_.timeScale * 1.1f, 100000.0f);
-    if (glfwGetKey(window_, GLFW_KEY_MINUS)   == GLFW_PRESS) state_.timeScale = std::max(state_.timeScale / 1.1f, 0.05f);
+    if (action == GLFW_PRESS && key == GLFW_KEY_EQUAL) state_.timeScale = std::min(state_.timeScale * 1.1f, 100000.0f);
+    if (action == GLFW_PRESS && key == GLFW_KEY_MINUS) state_.timeScale = std::max(state_.timeScale / 1.1f, 0.05f);
     
     // Пауза на K
-    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_PRESS)   state_.pause = true;
-    if (glfwGetKey(window_, GLFW_KEY_K) == GLFW_RELEASE) state_.pause = false;
+    if (key == GLFW_KEY_K) {
+        if (action == GLFW_PRESS) state_.pause = true;
+        if (action == GLFW_RELEASE) state_.pause = false;
+    }
 
     // Выход на Q
-    if (glfwGetKey(window_, GLFW_KEY_Q) == GLFW_PRESS) {
+    if (key == GLFW_KEY_Q && action == GLFW_PRESS) {
         glfwTerminate();
         glfwSetWindowShouldClose(window_, GLFW_TRUE);
         state_.running = false;
@@ -65,7 +72,7 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
 
     //регулировка размера окна 
     // уменьшение
-    if (glfwGetKey(window_, GLFW_KEY_LEFT_BRACKET) == GLFW_PRESS) {
+    if (key == GLFW_KEY_LEFT_BRACKET && action == GLFW_PRESS) {
         int w = 0, h = 0;  
         glfwGetWindowSize(window_, &w, &h);
         w = (int) (w * 0.9);
@@ -77,7 +84,7 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
     }
 
     //увеличение
-    if (glfwGetKey(window_, GLFW_KEY_RIGHT_BRACKET) == GLFW_PRESS) {
+    if (key == GLFW_KEY_RIGHT_BRACKET && action == GLFW_PRESS) {
         int w = 0; 
         int h = 0; 
         glfwGetWindowSize(window_, &w, &h);

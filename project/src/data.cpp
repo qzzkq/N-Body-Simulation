@@ -242,13 +242,6 @@ bool LoadSystemFromTextFile(const std::string& filePath,
             cg /= 255.0;
             cb /= 255.0;
         }
-        o.color = glm::vec4(
-            static_cast<float>(std::clamp(cr, 0.0, 1.0)),
-            static_cast<float>(std::clamp(cg, 0.0, 1.0)),
-            static_cast<float>(std::clamp(cb, 0.0, 1.0)),
-            1.0f
-        );
-
         outObjs.push_back(std::move(o));
     }
 
@@ -283,9 +276,9 @@ bool SaveSystemToTextFile(const std::string& filePath,
         const glm::dvec3 posM = obj.position / physics::METERS_TO_AU;
         const glm::dvec3 velMs = obj.velocity / physics::VELOCITY_TO_AU_PER_YEAR;
 
-        const int r = static_cast<int>(std::clamp(obj.color.r, 0.0f, 1.0f) * 255.0f);
-        const int g = static_cast<int>(std::clamp(obj.color.g, 0.0f, 1.0f) * 255.0f);
-        const int b = static_cast<int>(std::clamp(obj.color.b, 0.0f, 1.0f) * 255.0f);
+        const int r = 255;
+        const int g = 255;
+        const int b = 255;
 
         out << name << ' '
             << massKg << ' '
@@ -320,17 +313,27 @@ static CompType GetInitType() {
     return t;
 }
 
-struct PosVelRecord {
+struct PosRecord {
     glm::dvec3 position;
-    glm::dvec3 velocity;
 };
 
-static CompType GetPosVelType() {
+struct PosRecordFile {
+    glm::vec3 position;
+};
+
+static CompType GetTrackType() {
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_FLOAT, 1, v3dims);
+    CompType t(sizeof(PosRecordFile));
+    t.insertMember("position", HOFFSET(PosRecordFile, position), vec3Type);
+    return t;
+}
+
+static CompType GetTrackMemType() {
     hsize_t v3dims[1] = {3};
     ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
-    CompType t(sizeof(PosVelRecord));
-    t.insertMember("position", HOFFSET(PosVelRecord, position), vec3Type);
-    t.insertMember("velocity", HOFFSET(PosVelRecord, velocity), vec3Type);
+    CompType t(sizeof(PosRecord));
+    t.insertMember("position", HOFFSET(PosRecord, position), vec3Type);
     return t;
 }
 
@@ -365,7 +368,7 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
 
         DSetCreatPropList prop;
         hsize_t timeStepsInChunk = 1;
-        size_t frameSize = nb * 6 * sizeof(double);
+        size_t frameSize = nb * 3 * sizeof(float);
         if (frameSize > 0) {
              timeStepsInChunk = 262144 / frameSize;
              if (timeStepsInChunk < 1) timeStepsInChunk = 1;
@@ -376,7 +379,7 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
         prop.setShuffle(); 
         prop.setDeflate(6);
 
-        file.createDataSet("tracks", GetPosVelType(), tracksSpace, prop);
+        file.createDataSet("tracks", GetTrackType(), tracksSpace, prop);
     }
 
     file.flush(H5F_SCOPE_GLOBAL);
@@ -409,16 +412,15 @@ void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std
     hsize_t count[2]  = { 1, numBodies };
     fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
 
-    std::vector<PosVelRecord> posvels(objs.size());
+    std::vector<PosRecord> posData(objs.size());
     for (size_t i = 0; i < objs.size(); ++i) {
-        posvels[i].position = objs[i].position;
-        posvels[i].velocity = objs[i].velocity;
+        posData[i].position = objs[i].position;
     }
 
     hsize_t memDims[2] = { 1, numBodies };
     DataSpace memSpace(2, memDims);
 
-    dset.write(posvels.data(), GetPosVelType(), memSpace, fileSpace);
+    dset.write(posData.data(), GetTrackMemType(), memSpace, fileSpace);
 }
 
 void CloseSimulationFile(H5::H5File& file, std::size_t totalFrames)

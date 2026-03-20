@@ -14,12 +14,15 @@
 #include <cmath>
 #include <algorithm>
 #include <limits>
+#include <utility>
+#include <array>
 
 #ifdef _WIN32
 #include <windows.h>
 #endif
 
 #include "object.hpp"
+#include "graphic_state.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
 #include "physics.hpp"
@@ -30,6 +33,7 @@ using namespace H5;
 char title[256];
 
 std::vector<Object> objs;
+std::vector<GraphicState> graphics;
 
 struct InitRecord {
     glm::dvec3 position;
@@ -47,18 +51,41 @@ static CompType GetInitType() {
     return t;
 }
 
-struct PosVelRecord {
+struct PosRecord {
     glm::dvec3 position;
-    glm::dvec3 velocity;
 };
 
-static CompType GetPosVelType() {
+struct PosRecordFile {
+    glm::vec3 position;
+};
+
+static CompType GetTrackType() {
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_FLOAT, 1, v3dims);
+    CompType t(sizeof(PosRecordFile));
+    t.insertMember("position", HOFFSET(PosRecordFile, position), vec3Type);
+    return t;
+}
+
+static CompType GetTrackMemType() {
     hsize_t v3dims[1] = {3};
     ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
-    CompType t(sizeof(PosVelRecord));
-    t.insertMember("position", HOFFSET(PosVelRecord, position), vec3Type);
-    t.insertMember("velocity", HOFFSET(PosVelRecord, velocity), vec3Type);
+    CompType t(sizeof(PosRecord));
+    t.insertMember("position", HOFFSET(PosRecord, position), vec3Type);
     return t;
+}
+
+static glm::dvec3 catmullRom(const glm::dvec3& p0,
+                             const glm::dvec3& p1,
+                             const glm::dvec3& p2,
+                             const glm::dvec3& p3,
+                             double t) {
+    const double t2 = t * t;
+    const double t3 = t2 * t;
+    return 0.5 * ((2.0 * p1) +
+                  (-p0 + p2) * t +
+                  (2.0 * p0 - 5.0 * p1 + 4.0 * p2 - p3) * t2 +
+                  (-p0 + 3.0 * p1 - 3.0 * p2 + p3) * t3);
 }
 
 const int INTERPOLATION_STEPS = 10;
@@ -128,7 +155,8 @@ int main(int argc, char** argv) {
         std::cerr << "Error reading /initial_data.\n";
         return 1;
     }
-    physics::colorFromMass(objs);
+    graphics.resize(objs.size());
+    physics::colorFromMass(objs, graphics);
 
     DataSet tracksSet;
     try {
@@ -161,13 +189,28 @@ int main(int argc, char** argv) {
 
     double lastRealTime = glfwGetTime();
 
-    size_t frameA = 0;
-    size_t lastReadFrameIdx = 99999999999;
-    size_t pageNumber = 0;
+    const size_t INVALID_FRAME_IDX = 99999999999ull;
+    std::array<std::vector<glm::dvec3>, 4> frames;
+    std::array<size_t, 4> frameIds = {INVALID_FRAME_IDX, INVALID_FRAME_IDX, INVALID_FRAME_IDX, INVALID_FRAME_IDX};
+    for (auto& f : frames) f.resize(numBodies);
+    size_t lastFrameA = INVALID_FRAME_IDX;
 
-    std::vector<PosVelRecord> bufferA(numBodies);
-    std::vector<PosVelRecord> bufferB(numBodies);
     std::vector<glm::dvec3> targetPosition(numBodies);
+    std::vector<PosRecord> readScratch(numBodies);
+    auto readFrame = [&](size_t frameIdx, std::vector<glm::dvec3>& out) {
+        hsize_t count[2] = { 1, static_cast<hsize_t>(numBodies) };
+        hsize_t memDims[2] = { 1, static_cast<hsize_t>(numBodies) };
+        DataSpace memSpace(2, memDims);
+
+        hsize_t offset[2] = { static_cast<hsize_t>(frameIdx), 0 };
+        DataSpace fileSpace = tracksSet.getSpace();
+        fileSpace.selectHyperslab(H5S_SELECT_SET, count, offset);
+        tracksSet.read(readScratch.data(), GetTrackMemType(), memSpace, fileSpace);
+        for (size_t i = 0; i < numBodies; ++i) {
+            out[i] = readScratch[i].position;
+        }
+    };
+
     double ratio;
     while (!glfwWindowShouldClose(renderer.getWindow()) && state.running) {
         double now = glfwGetTime();
@@ -182,63 +225,55 @@ int main(int argc, char** argv) {
         if (playbackTime > maxTime) playbackTime = 0.0;
         if (playbackTime < 0.0) playbackTime = maxTime;
         ratio = playbackTime / fixedDt;
-        frameA = (size_t)ratio;
+        size_t frameA = (size_t)ratio;
         size_t frameB = frameA + 1;
         if (frameA >= numFrames) frameA = numFrames - 1;
         if (frameB >= numFrames) frameB = numFrames - 1;
 
-        if (frameA < lastReadFrameIdx && lastReadFrameIdx != 99999999999) {
-            for (auto& obj : objs) {
-                obj.trail.clear(); 
+        const size_t p0 = (frameA > 0) ? frameA - 1 : frameA;
+        const size_t p1 = frameA;
+        const size_t p2 = frameB;
+        const size_t p3 = std::min(frameB + 1, numFrames - 1);
+
+        const bool movingForward = (lastFrameA != INVALID_FRAME_IDX) && (frameA == lastFrameA + 1);
+        if (!movingForward || frameIds[1] != lastFrameA) {
+            readFrame(p0, frames[0]); frameIds[0] = p0;
+            readFrame(p1, frames[1]); frameIds[1] = p1;
+            readFrame(p2, frames[2]); frameIds[2] = p2;
+            readFrame(p3, frames[3]); frameIds[3] = p3;
+        } else {
+            std::swap(frames[0], frames[1]); std::swap(frameIds[0], frameIds[1]);
+            std::swap(frames[1], frames[2]); std::swap(frameIds[1], frameIds[2]);
+            std::swap(frames[2], frames[3]); std::swap(frameIds[2], frameIds[3]);
+            if (frameIds[3] != p3) {
+                readFrame(p3, frames[3]);
+                frameIds[3] = p3;
             }
         }
 
-        if (lastReadFrameIdx != frameA) {
-            hsize_t count[2] = { 1, static_cast<hsize_t>(numBodies) };
-            hsize_t memDims[2] = { 1, static_cast<hsize_t>(numBodies) };
-            DataSpace memSpace(2, memDims);
-
-            hsize_t offsetA[2] = { static_cast<hsize_t>(frameA), 0 };
-            DataSpace fileSpaceA = tracksSet.getSpace();
-            fileSpaceA.selectHyperslab(H5S_SELECT_SET, count, offsetA);
-            tracksSet.read(bufferA.data(), GetPosVelType(), memSpace, fileSpaceA);
-            
-            hsize_t offsetB[2] = { static_cast<hsize_t>(frameB), 0 };
-            DataSpace fileSpaceB = tracksSet.getSpace();
-            fileSpaceB.selectHyperslab(H5S_SELECT_SET, count, offsetB);
-            tracksSet.read(bufferB.data(), GetPosVelType(), memSpace, fileSpaceB);
+        if (frameA < lastFrameA && lastFrameA != INVALID_FRAME_IDX) {
+            for (auto& g : graphics) {
+                g.resetTrail();
+            }
         }
 
-        double t = ratio - frameA;
-        double t2 = t * t;
-        double t3 = t2 * t;
-
-        double h00 = 2.0 * t3 - 3.0 * t2 + 1.0;
-        double h10 = t3 - 2.0 * t2 + t;
-        double h01 = -2.0 * t3 + 3.0 * t2;
-        double h11 = t3 - t2;
+        const double t = ratio - frameA;
 
         for (size_t i = 0; i < numBodies; ++i) {
-            glm::dvec3 p0 = bufferA[i].position;
-            glm::dvec3 v0 = bufferA[i].velocity;
-            glm::dvec3 p1 = bufferB[i].position;
-            glm::dvec3 v1 = bufferB[i].velocity;
-
-            targetPosition[i] = p0 * h00 + 
-                                v0 * (h10 * fixedDt) + 
-                                p1 * h01 + 
-                                v1 * (h11 * fixedDt);
+            targetPosition[i] = catmullRom(frames[0][i], frames[1][i], frames[2][i], frames[3][i], t);
         }
 
         for (size_t i = 0; i < numBodies; ++i) {
             objs[i].position = targetPosition[i];
         }
 
-        // for(auto& obj : objs) obj.updateTrail(); 
+        for (size_t i = 0; i < numBodies; ++i) {
+            graphics[i].updateTrail(objs[i].position);
+        }
 
-        lastReadFrameIdx = frameA;
+        lastFrameA = frameA;
 
-    renderer.renderFrame(objs, cam); 
+    renderer.renderFrame(objs, graphics, cam); 
 
         std::snprintf(title, sizeof(title),
                       "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",

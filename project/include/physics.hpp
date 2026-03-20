@@ -5,6 +5,7 @@
 #include <cmath>
 #include <limits>
 #include "object.hpp"
+#include "graphic_state.hpp"
 
 namespace physics {
     constexpr double PI = 3.14159265358979323846;
@@ -22,8 +23,9 @@ namespace physics {
 
     // Gravitational constant in [AU^3 / (M_sun * year^2)]
     constexpr double G = 4.0 * PI * PI;
-    // Must match integrator softening (currently 1000 km in AU)
-    constexpr double SOFTENING_AU = 1.0e6 * METERS_TO_AU;
+    // Runtime-tunable integration settings (for accuracy experiments).
+    constexpr double DEFAULT_SOFTENING_AU = 0.0;
+    constexpr double DEFAULT_BARNES_HUT_THETA = 0.5;
 
     constexpr double RADIUS_SCALE = 1.0;
 
@@ -35,6 +37,12 @@ namespace physics {
     }
 
     double calculateTotalEnergy(const std::vector<Object>& objs);
+    double getSofteningAU();
+    void setSofteningAU(double softeningAu);
+    double getBarnesHutTheta();
+    void setBarnesHutTheta(double theta);
 
+    // Legacy API kept for compatibility with older call sites.
     void colorFromMass(std::vector<Object>& objs);
+    void colorFromMass(const std::vector<Object>& objs, std::vector<GraphicState>& graphics);
 }

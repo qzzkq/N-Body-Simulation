@@ -10,7 +10,9 @@
 #include <algorithm>
 #include <filesystem>
 #include <csignal>
+#include <array>
 #include "object.hpp"
+#include "graphic_state.hpp"
 #include "renderer.hpp"
 #include "control.hpp"
 #include "bodysystem.hpp"
@@ -38,11 +40,12 @@
 
 double gSimTime = 0.0;
 double fixedDt = 1.0 / 3652.5; // шаг времени;
-const int FIXED_STEPS = 100;
+const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
 std::vector<Object> objs = {};
+std::vector<GraphicState> graphics;
 volatile sig_atomic_t g_Interrupt = 0;
 
 void signalHandler(int signum) {
@@ -70,7 +73,7 @@ int main() {
     }
 
     renderer.setProjection(65.0f, 0.01f, 500.0f);
-    using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause);
+    using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause, bool forceSync);
     Handler simulationStep = nullptr;
 
     RenderMode renderMode = RenderMode::Sphere;
@@ -156,7 +159,6 @@ int main() {
             size_t idx = 0;
             std::cin >> idx;
             if (LoadObjectsFromFile(files[idx-1], "Particles", objs)) {
-                physics::colorFromMass(objs);
                 loaded = true;
                 std::cout << "Loaded " << objs.size() << " objects\n";
             }
@@ -207,9 +209,14 @@ if (!loaded) {
         }
     }
 
+    graphics.clear();
+    graphics.resize(objs.size());
+    physics::colorFromMass(objs, graphics);
+
     std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
     std::string filename;
     std::cin >> filename;
+    std::filesystem::create_directories("data");
     H5::H5File framesFile = CreateSimulationFile("data/" + filename + ".h5", objs.size(), fixedDt * FIXED_STEPS);
     std::size_t frameIndex = 0;
     WriteSimulationFrame(framesFile, objs, frameIndex);
@@ -221,6 +228,7 @@ if (!loaded) {
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
     const double initialEnergy = physics::calculateTotalEnergy(objs);
+    double energyCache = initialEnergy;
 
     Camera cam;
     SimState state; 
@@ -238,41 +246,58 @@ if (!loaded) {
     std::cin >> isRealTime;
 
     int stepCounter = 0;
+    int frameCounter = 0;
 
     if (isRealTime) {
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && !g_Interrupt) {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
             
-
             state.deltaTime = frameRealDt;
             lastTime = now;
             frameRealDt *= state.timeScale;
+            if (frameRealDt > 0.1) frameRealDt = 0.1;
+            if (frameRealDt < 0.0) frameRealDt = 0.0;
             accumulator += frameRealDt;
 
             int substeps = 0;
 
-            while (accumulator >= fixedDt && !g_Interrupt) {
-                simulationStep(objs, fixedDt, state.pause);
+            constexpr int MAX_SUBSTEPS = 100000;
+            while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS && !g_Interrupt) {
+                simulationStep(objs, fixedDt, state.pause, false);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
-                for(auto& obj : objs) obj.updateTrail();
+                for (std::size_t i = 0; i < objs.size(); ++i) {
+                    // graphics[i].updateTrail(objs[i].position);
+                }
+            }
+            if (substeps >= MAX_SUBSTEPS) {
+                accumulator = 0.0;
             }
 
             //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
             //renderer.updateView(cam);
             //renderer.drawObjects(objs);
 
-            renderer.renderFrame(objs, cam);
+            control.updateCameraFromKeys();
+
+            renderer.renderFrame(objs, graphics, cam);
+            ++frameCounter;
+            if (frameCounter % 100 == 0) {
+                // simulationStep(objs, 0.0, true, true);
+                //energyCache = physics::calculateTotalEnergy(objs); // O(N^2) - делаем реже
+            }
+
             double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
-            const double currentEnergy = physics::calculateTotalEnergy(objs);
+            /* const double currentEnergy = energyCache;
             const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
             const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
+            */
             std::snprintf(title, sizeof(title),
-                  "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f | Err: %.4f%%",
-                  state.timeScale, fps, objs.size(), gSimTime, errorPct);
+                  "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f",
+                  state.timeScale, fps, objs.size(), gSimTime);
             glfwSetWindowTitle(renderer.getWindow(), title);
 
             //glfwSwapBuffers(renderer.getWindow());
@@ -284,25 +309,41 @@ if (!loaded) {
         double targetTime;
         std::cout << "На какое время просчитываем? (сек): " << std::flush;
         std::cin >> targetTime;
+        double bakeStartRealTime = glfwGetTime();
 
         glfwSwapInterval(0);
         std::cout << "Начинаем расчет..." << std::endl;
 
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime && !g_Interrupt) {
-            simulationStep(objs, fixedDt, false);
+            simulationStep(objs, fixedDt, false, false);
             gSimTime += fixedDt;
             stepCounter += 1;
             if (stepCounter % (1 * 10) == 0) {
                 glfwPollEvents();
 
-                renderer.renderFrame(objs, cam);
+                // renderer.renderFrame(objs, graphics, cam);
                 double progress = (gSimTime / targetTime) * 100.0;
-                const double currentEnergy = physics::calculateTotalEnergy(objs);
+                double elapsed = glfwGetTime() - bakeStartRealTime;
+                double progress_dec = gSimTime / targetTime;
+                double etaSeconds = 0.0;
+                if (progress_dec > 0.001) {
+                    etaSeconds = (elapsed / progress_dec) - elapsed;
+                    if (etaSeconds < 0.0) etaSeconds = 0.0;
+                }
+                int etaTotalSec = static_cast<int>(etaSeconds);
+                int etaMin = etaTotalSec / 60;
+                int etaSec = etaTotalSec % 60;
+                /* if (stepCounter % 100 == 0) {
+                    simulationStep(objs, 0.0, true, true);
+                    energyCache = physics::calculateTotalEnergy(objs); // O(N^2) - реже
+                }
+                const double currentEnergy = energyCache;
                 const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
                 const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
+                */
                 std::snprintf(title, sizeof(title),
-                      "BAKING... %.1f%% | Time: %.2f / %.2f | Saved: %zu | Err: %.4f%%",
-                      progress, gSimTime, targetTime, frameIndex, errorPct);
+                      "BAKING... %.1f%% | ETA: %02d:%02d | Time: %.2f / %.2f | Saved: %zu",
+                      progress, etaMin, etaSec, gSimTime, targetTime, frameIndex);
                 glfwSetWindowTitle(renderer.getWindow(), title);
             }
             if (stepCounter % FIXED_STEPS == 0) {
@@ -317,6 +358,7 @@ if (!loaded) {
         std::cout << "Получен SIGINT (Ctrl+C). Завершаем симуляцию и сохраняем текущее состояние...\n";
     }
 
+    simulationStep(objs, 0.0, true, true);
     const std::string finalTextPath = "data/" + filename + "_final.txt";
     if (SaveSystemToTextFile(finalTextPath, objs)) {
         std::cout << "Финальное состояние сохранено в " << finalTextPath << "\n";

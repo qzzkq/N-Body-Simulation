@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #include <vector>
 #include "object.hpp"
+#include "graphic_state.hpp"
 #include "camera.hpp" 
 
 enum class RenderMode { Sphere, Points, Cubes };
@@ -17,20 +18,21 @@ public:
 
     void setProjection(float fov_deg, float znear, float zfar);
     void updateView(const Camera& camera);
-    void drawObjects(const std::vector<Object>& objs) const;
+    void drawObjects(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam);
     
     void setRenderMode(RenderMode mode) { mode_ = mode; }
 
     GLFWwindow* getWindow() const { return window_; }
     
-    void renderFrame(const std::vector<Object>& objs, const Camera& cam);
+    void renderFrame(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam);
     
     void resizeWindow(int w, int h);
 
-    void drawTrails(const std::vector<Object>& objs) const; 
+    void drawTrails(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam); 
 
 private:
     GLuint compileProgram(const char* vs, const char* fs);
+    void setupInstanceAttribs(GLuint vao);
     
     GLFWwindow* window_ = nullptr; 
 
@@ -48,9 +50,10 @@ private:
     void initProgram(); 
 
     GLuint program_;
-    GLint uModel_, uView_, uProj_, uColor_;
+    GLint uModel_, uView_, uProj_, uColor_, uUseInstancing_;
     
     GLuint trailProgram_;
+    GLuint pointProgram_;
 
     RenderMode mode_ = RenderMode::Cubes; 
 
@@ -66,6 +69,11 @@ private:
     // VAO и VBO для точки 
     GLuint pointVAO_ = 0;
     GLuint pointVBO_ = 0;
+    GLuint pointColorVBO_ = 0;
+
+    // VBO для инстансинга (матрица модели + цвет)
+    GLuint instanceModelVBO_ = 0;
+    GLuint instanceColorVBO_ = 0;
 
     //VAO и VBO для трэйлов
     GLuint trailVAO_ = 0;
@@ -73,6 +81,7 @@ private:
 
     glm::mat4 viewMatrix_; 
     glm::mat4 projectionMatrix_; 
+    float farPlane_ = 500.0f;
     
     bool successInit_ = false; 
 };

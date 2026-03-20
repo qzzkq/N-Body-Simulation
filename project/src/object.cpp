@@ -9,9 +9,9 @@ Object::Object(glm::dvec3 initPosition, glm::dvec3 initVelocity,
 {
     position = initPosition;
     velocity = initVelocity;
+    acceleration = glm::dvec3(0.0);
     Initalizing = false;
     Launched = false;
-    color = glm::vec4(1.0f); // Белый по умолчанию
 
     // Логика вычисления недостающих параметров
     if (massOpt.has_value() && densityOpt.has_value() && radiusOpt.has_value()) {
