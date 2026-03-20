@@ -128,6 +128,17 @@ int main() {
             break;
     }
 
+    std::cout << "Введите шаг времени dt (например, 0.000273785 для 1/3652.5): ";
+    std::string dtInput;
+    std::cin >> dtInput;
+    
+    try {
+        fixedDt = std::stod(dtInput);
+    } catch (...) {
+        std::cout << "Некорректный ввод. Используется dt по умолчанию (1/3652.5).\n";
+        fixedDt = 1.0 / 3652.5;
+    }
+
     // -------- выбор сценария (HDF5 / TXT / рандом) --------
     std::cout << "Источник начальных условий: [0] HDF5, [1] TXT, [2] Random: " << std::flush;
     std::cin >> mode;

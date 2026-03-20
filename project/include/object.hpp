@@ -36,7 +36,7 @@ public:
             return;
         }
 
-        float distanceThreshold = 1.0f;
+        float distanceThreshold = 0.2f;
         if (glm::distance(glm::vec3(position), trail.back()) > distanceThreshold) {
             trail.push_back(position);
         }
