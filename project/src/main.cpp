@@ -72,7 +72,8 @@ int main() {
         return -1;
     }
 
-    renderer.setProjection(65.0f, 0.01f, 500.0f);
+    // Дальняя плоскость в AU (логарифмический Z в шейдерах): ~10^10 AU — очень большая дальность видения.
+    renderer.setProjection(65.0f, 1.0f, 1.0e10f);
     using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause, bool forceSync);
     Handler simulationStep = nullptr;
 
@@ -80,6 +81,7 @@ int main() {
     auto scenarioManager = CreateDefaultManager();
 
     bool loaded = false;
+    bool loadedColorsFromTxt = false;
     int mode;
     std::cout << "Кубы/шары/точка [0/1/2]\n";
     std::cin >> mode;
@@ -170,8 +172,9 @@ int main() {
         std::cout << "Введите путь к TXT-файлу (пример: data/solar_system.txt): " << std::flush;
         std::cin >> txtPath;
 
-        if (LoadSystemFromTextFile(txtPath, objs)) {
+        if (LoadSystemFromTextFile(txtPath, objs, &graphics)) {
             loaded = true;
+            loadedColorsFromTxt = true;
             std::cout << "Loaded " << objs.size() << " objects from text config\n";
         } else {
             std::cout << "Не удалось загрузить TXT. Генерируем рандомно.\n";
@@ -209,9 +212,11 @@ if (!loaded) {
         }
     }
 
-    graphics.clear();
-    graphics.resize(objs.size());
-    physics::colorFromMass(objs, graphics);
+    if (!loadedColorsFromTxt) {
+        graphics.clear();
+        graphics.resize(objs.size());
+        physics::colorFromMass(objs, graphics);
+    }
 
     std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
     std::string filename;
@@ -258,7 +263,13 @@ if (!loaded) {
             frameRealDt *= state.timeScale;
             if (frameRealDt > 0.1) frameRealDt = 0.1;
             if (frameRealDt < 0.0) frameRealDt = 0.0;
-            accumulator += frameRealDt;
+            // Зажатый Shift: время симуляции не идёт (удобно летать камерой / менять Shift+− скорость камеры).
+            GLFWwindow* win = renderer.getWindow();
+            const bool shiftFreeze = (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+                || (glfwGetKey(win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+            if (!shiftFreeze) {
+                accumulator += frameRealDt;
+            }
 
             int substeps = 0;
 
@@ -269,8 +280,9 @@ if (!loaded) {
                 accumulator -= fixedDt;
                 ++substeps;
                 for (std::size_t i = 0; i < objs.size(); ++i) {
-                    // graphics[i].updateTrail(objs[i].position);
+                    graphics[i].updateTrail(objs[i].position);
                 }
+                renderer.renderFrame(objs, graphics, cam);
             }
             if (substeps >= MAX_SUBSTEPS) {
                 accumulator = 0.0;
@@ -282,7 +294,7 @@ if (!loaded) {
 
             control.updateCameraFromKeys();
 
-            renderer.renderFrame(objs, graphics, cam);
+            //renderer.renderFrame(objs, graphics, cam);
             ++frameCounter;
             if (frameCounter % 100 == 0) {
                 // simulationStep(objs, 0.0, true, true);
@@ -296,8 +308,9 @@ if (!loaded) {
             const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
             */
             std::snprintf(title, sizeof(title),
-                  "REAL-TIME | Speed: %.1fx | FPS: %.0f | Obj: %zu | Time: %.2f",
-                  state.timeScale, fps, objs.size(), gSimTime);
+                  "REAL-TIME | Sim: %.1fx | Cam: %.2fx | FPS: %.0f | Obj: %zu | Time: %.2f%s",
+                  state.timeScale, control.getCameraMoveScale(), fps, objs.size(), gSimTime,
+                  shiftFreeze ? " | [SHIFT freeze]" : "");
             glfwSetWindowTitle(renderer.getWindow(), title);
 
             //glfwSwapBuffers(renderer.getWindow());

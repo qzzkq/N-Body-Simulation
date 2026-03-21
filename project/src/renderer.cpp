@@ -72,6 +72,11 @@ void main() {
     gl_Position = projection * view * vec4(aPos, 1.0);
     float C = 1.0;
     gl_Position.z = (2.0 * log(C * gl_Position.w + 1.0) / log(C * farPlane + 1.0) - 1.0) * gl_Position.w;
+    float dist = length(aPos);
+    const float refDist = 2000.0;
+    const float pxRef = 4.5;
+    float sizePx = pxRef * refDist / max(dist, refDist * 0.02);
+    gl_PointSize = clamp(sizePx, 0.5, 48.0);
 }
 )glsl";
 
@@ -167,63 +172,63 @@ void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<Gr
 
     static std::vector<glm::mat4> modelMatrices;
     static std::vector<glm::vec4> colors;
-    modelMatrices.resize(objs.size());
-    colors.resize(objs.size());
+    static std::vector<glm::vec3> pointPositions;
+    static std::vector<glm::vec4> pointColors;
+
+    // Очищаем векторы, но capacity сохраняется (быстро работает)
+    modelMatrices.clear(); colors.clear();
+    pointPositions.clear(); pointColors.clear();
+
+    const float lodSphereMaxDist = 15000.0f; // Дистанция перехода
+
     for (std::size_t i = 0; i < objs.size(); ++i) {
         glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
         float distance = static_cast<float>(glm::length(relativePos));
-        float visualScale = std::max(objs[i].radius, distance * 0.002f);
-        glm::mat4 M(1.0f);
-        M = glm::translate(M, glm::vec3(relativePos));
-        M = glm::scale(M, glm::vec3(visualScale));
-        modelMatrices[i] = M;
-        colors[i] = graphics[i].color;
+
+        if (distance < lodSphereMaxDist) {
+            // Рисуем как сферу (вблизи)
+            const float farFalloff = 1.0f / (1.0f + distance / 30000.0f);
+            float visualScale = std::max(static_cast<float>(objs[i].radius), distance * 0.002f * farFalloff);
+
+            glm::mat4 M(1.0f);
+            M = glm::translate(M, glm::vec3(relativePos));
+            M = glm::scale(M, glm::vec3(visualScale));
+
+            modelMatrices.push_back(M);
+            colors.push_back(graphics[i].color);
+        } else {
+            // Рисуем как точку (вдали) - здесь работает твой идеальный шейдер POINT_VS
+            pointPositions.push_back(glm::vec3(relativePos));
+            pointColors.push_back(graphics[i].color);
+        }
     }
 
-    glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
-    glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
-    glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec4), colors.data(), GL_DYNAMIC_DRAW);
-
-    // Pass 1: instanced geometry pass
-    if (mode_ == RenderMode::Cubes || mode_ == RenderMode::Sphere) {
-        const bool drawCubes = (mode_ == RenderMode::Cubes);
-        const GLsizei vertexCount = drawCubes ? 36 : static_cast<GLsizei>(sphereVertexCount_);
+    // Pass 1: Отрисовка ближних объектов (Сферы)
+    if (!modelMatrices.empty()) {
+        glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
+        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
+        glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec4), colors.data(), GL_DYNAMIC_DRAW);
 
         glUniform1i(uUseInstancing_, 1);
-        glBindVertexArray(drawCubes ? cubeVAO_ : sphereVAO_);
-        if (!objs.empty()) {
-            glDrawArraysInstanced(GL_TRIANGLES, 0, vertexCount, static_cast<GLsizei>(objs.size()));
-        }
+        glBindVertexArray(sphereVAO_);
+        glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(sphereVertexCount_), static_cast<GLsizei>(modelMatrices.size()));
         glBindVertexArray(0);
     }
 
-    // Pass 2: batched point pass (single draw call).
-    static std::vector<glm::vec3> pointPositions;
-    static std::vector<glm::vec4> pointColors;
-    pointPositions.resize(objs.size());
-    pointColors.resize(objs.size());
-    for (std::size_t i = 0; i < objs.size(); ++i) {
-        glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
-        pointPositions[i] = glm::vec3(relativePos);
-        pointColors[i] = colors[i];
+    // Pass 2: Отрисовка дальних объектов (Точки)
+    if (!pointPositions.empty()) {
+        glUseProgram(pointProgram_);
+        glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
+        glBufferData(GL_ARRAY_BUFFER, pointPositions.size() * sizeof(glm::vec3), pointPositions.data(), GL_DYNAMIC_DRAW);
+        glBindBuffer(GL_ARRAY_BUFFER, pointColorVBO_);
+        glBufferData(GL_ARRAY_BUFFER, pointColors.size() * sizeof(glm::vec4), pointColors.data(), GL_DYNAMIC_DRAW);
+
+        glBindVertexArray(pointVAO_);
+        glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(pointPositions.size()));
+        glBindVertexArray(0);
     }
 
-    glUseProgram(pointProgram_);
-
-    glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
-    glBufferData(GL_ARRAY_BUFFER, pointPositions.size() * sizeof(glm::vec3), pointPositions.data(), GL_DYNAMIC_DRAW);
-    glBindBuffer(GL_ARRAY_BUFFER, pointColorVBO_);
-    glBufferData(GL_ARRAY_BUFFER, pointColors.size() * sizeof(glm::vec4), pointColors.data(), GL_DYNAMIC_DRAW);
-
-    glPointSize(3.0f);
-    glBindVertexArray(pointVAO_);
-    if (!objs.empty()) {
-        glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(objs.size()));
-    }
-    glBindVertexArray(0);
-
-    // Возвращаем основной шейдер как активный для следующего кадра.
     glUseProgram(program_);
 }
 
@@ -463,6 +468,7 @@ bool Renderer::initWindow(int width, int height, const char* title, bool fullscr
     }
 
     glEnable(GL_DEPTH_TEST);
+    glEnable(GL_PROGRAM_POINT_SIZE);
 
     int bufferWidth, bufferHeight;
     glfwGetFramebufferSize(window, &bufferWidth, &bufferHeight);

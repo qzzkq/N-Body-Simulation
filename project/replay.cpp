@@ -137,7 +137,7 @@ int main(int argc, char** argv) {
         return 1;
     }
 
-    renderer.setProjection(65.0f, 0.1f, 100000.0f);
+    renderer.setProjection(65.0f, 1.0f, 1.0e10f);
 
     cam.pos = glm::vec3(0.0f, 50.0f, 250.0f);
     cam.front = glm::vec3(0.0f, 0.0f, -1.0f);
@@ -167,9 +167,15 @@ int main(int argc, char** argv) {
         lastRealTime = now;
         state.deltaTime = (float)realDt;
 
-        if (!state.pause) {
+        GLFWwindow* win = renderer.getWindow();
+        const bool shiftFreeze = (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
+            || (glfwGetKey(win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
+
+        if (!state.pause && !shiftFreeze) {
             playbackTime += realDt * state.timeScale;
         }
+
+        control.updateCameraFromKeys();
 
         if (playbackTime > maxTime) playbackTime = 0.0;
         if (playbackTime < 0.0) playbackTime = maxTime;
@@ -218,8 +224,9 @@ int main(int argc, char** argv) {
     renderer.renderFrame(objs, cam); 
 
         std::snprintf(title, sizeof(title),
-                      "Replay | Time: %.2f / %.2f | Frame: %zu | Speed: x%.2f",
-                      playbackTime, maxTime, frameA, state.timeScale);
+                      "Replay | Time: %.2f / %.2f | Frame: %zu | Sim: x%.2f | Cam: x%.2f%s",
+                      playbackTime, maxTime, frameA, state.timeScale, control.getCameraMoveScale(),
+                      shiftFreeze ? " | [SHIFT freeze]" : "");
         glfwSetWindowTitle(renderer.getWindow(), title);
         glfwPollEvents();
     }
