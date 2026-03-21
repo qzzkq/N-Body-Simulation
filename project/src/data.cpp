@@ -170,7 +170,8 @@ bool LoadObjectsFromFile(const std::string& filePath,
 }
 
 bool LoadSystemFromTextFile(const std::string& filePath,
-                            std::vector<Object>& outObjs)
+                            std::vector<Object>& outObjs,
+                            std::vector<GraphicState>* outGraphics)
 {
     std::ifstream in(filePath);
     if (!in.is_open()) {
@@ -179,6 +180,9 @@ bool LoadSystemFromTextFile(const std::string& filePath,
     }
 
     outObjs.clear();
+    if (outGraphics != nullptr) {
+        outGraphics->clear();
+    }
 
     std::string line;
     std::size_t lineNo = 0;
@@ -212,6 +216,9 @@ bool LoadSystemFromTextFile(const std::string& filePath,
             std::cerr << "LoadSystemFromTextFile: invalid format at line " << lineNo
                       << " in file " << filePath << "\n";
             outObjs.clear();
+            if (outGraphics != nullptr) {
+                outGraphics->clear();
+            }
             return false;
         }
 
@@ -220,6 +227,9 @@ bool LoadSystemFromTextFile(const std::string& filePath,
             std::cerr << "LoadSystemFromTextFile: unexpected trailing token at line "
                       << lineNo << " in file " << filePath << "\n";
             outObjs.clear();
+            if (outGraphics != nullptr) {
+                outGraphics->clear();
+            }
             return false;
         }
 
@@ -243,6 +253,11 @@ bool LoadSystemFromTextFile(const std::string& filePath,
             cb /= 255.0;
         }
         outObjs.push_back(std::move(o));
+        if (outGraphics != nullptr) {
+            GraphicState gs;
+            gs.color = glm::vec4(static_cast<float>(cr), static_cast<float>(cg), static_cast<float>(cb), 1.0f);
+            outGraphics->push_back(std::move(gs));
+        }
     }
 
     if (outObjs.empty()) {

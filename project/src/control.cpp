@@ -2,6 +2,7 @@
 #include <GLFW/glfw3.h>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <algorithm>
 #include <cmath>
 
 Control::Control(GLFWwindow* window, 
@@ -37,26 +38,42 @@ void Control::attach() {
 }
 
 void Control::updateCameraFromKeys() {
-    float cameraSpeed = 25.0f * state_.deltaTime;
+    float cameraSpeed = 25.0f * cameraMoveScale_ * state_.deltaTime;
     if (cameraSpeed == 0.0f) return;
 
-    // Камера WASD + Space/Shift.
-    // Переехало в основной цикл, чтобы не зависеть от частоты событий onKey.
+    // Камера WASD + Space / Ctrl (вниз). Shift зарезервирован под «заморозку времени» в main/replay.
     if (glfwGetKey(window_, GLFW_KEY_W) == GLFW_PRESS) camera_.pos += cameraSpeed * camera_.front;
     if (glfwGetKey(window_, GLFW_KEY_S) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.front;
     if (glfwGetKey(window_, GLFW_KEY_A) == GLFW_PRESS) camera_.pos -= cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
     if (glfwGetKey(window_, GLFW_KEY_D) == GLFW_PRESS) camera_.pos += cameraSpeed * glm::normalize(glm::cross(camera_.front, camera_.up));
     if (glfwGetKey(window_, GLFW_KEY_SPACE) == GLFW_PRESS) camera_.pos += cameraSpeed * camera_.up;
-    if (glfwGetKey(window_, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.up;
+    if (glfwGetKey(window_, GLFW_KEY_LEFT_CONTROL) == GLFW_PRESS) camera_.pos -= cameraSpeed * camera_.up;
 }
 
 void Control::onKey(int key, int /*scancode*/, int action, int mods) {
-    (void)mods;
+    const bool shift = (mods & GLFW_MOD_SHIFT) != 0;
+    const bool repeat = (action == GLFW_PRESS || action == GLFW_REPEAT);
 
-    // Ускорение/замедление времени
-    if (action == GLFW_PRESS && key == GLFW_KEY_EQUAL) state_.timeScale = std::min(state_.timeScale * 1.1f, 100000.0f);
-    if (action == GLFW_PRESS && key == GLFW_KEY_MINUS) state_.timeScale = std::max(state_.timeScale / 1.1f, 0.05f);
-    
+    // Shift + − / Shift + =: скорость перемещения камеры (WASD, колёсико). Без Shift — время симуляции.
+    if (repeat && shift) {
+        if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
+            cameraMoveScale_ = std::max(cameraMoveScale_ / 1.1f, 0.01f);
+            return;
+        }
+        if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
+            cameraMoveScale_ *= 1.1f;
+            return;
+        }
+    }
+
+    if (action == GLFW_PRESS && !shift) {
+        if (key == GLFW_KEY_EQUAL || key == GLFW_KEY_KP_ADD) {
+            state_.timeScale *= 1.1f;
+        } else if (key == GLFW_KEY_MINUS || key == GLFW_KEY_KP_SUBTRACT) {
+            state_.timeScale = std::max(state_.timeScale / 1.1f, 0.05f);
+        }
+    }
+
     // Пауза на K
     if (key == GLFW_KEY_K) {
         if (action == GLFW_PRESS) state_.pause = true;
@@ -99,7 +116,7 @@ void Control::onKey(int key, int /*scancode*/, int action, int mods) {
 }
 
 void Control::onScroll(double /*xoffset*/, double yoffset) {
-    float cameraSpeed = 100.0f * state_.deltaTime;
+    float cameraSpeed = 100.0f * cameraMoveScale_ * state_.deltaTime;
     if (yoffset > 0)      camera_.pos += cameraSpeed *  camera_.front;
     else if (yoffset < 0) camera_.pos -= cameraSpeed *  camera_.front;
 }

@@ -17,6 +17,9 @@ public:
     void attach();
     void updateCameraFromKeys();
 
+    /** Множитель скорости WASD/колёсика (Shift+− / Shift+=). */
+    float getCameraMoveScale() const { return cameraMoveScale_; }
+
 private:
     // Статические обёртки для GLFW
     static void KeyCB(GLFWwindow* w, int key, int scancode, int action, int mods);
@@ -33,4 +36,5 @@ private:
     std::vector<Object>& objs_;
     Camera& camera_;
     SimState& state_;
+    float cameraMoveScale_ = 1.0f;
 };

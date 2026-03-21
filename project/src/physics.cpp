@@ -80,6 +80,16 @@ void colorFromMass(const std::vector<Object>& objs, std::vector<GraphicState>& g
     double logMax = std::log10(maxMass);
     double range = logMax - logMin;
 
+    // Одинаковая масса (напр. все звёзды M13): лог-диапазон ноль — иначе все одним цветом.
+    if (range <= 1e-12) {
+        for (std::size_t i = 0; i < objs.size(); ++i) {
+            float t = objs.size() > 1 ? static_cast<float>(i) / static_cast<float>(objs.size() - 1) : 0.5f;
+            glm::vec3 finalColor = glm::mix(colorCold, colorHot, t);
+            graphics[i].color = glm::vec4(finalColor, 1.0f);
+        }
+        return;
+    }
+
     // присваиваем цвета объектам
     for (std::size_t i = 0; i < objs.size(); ++i) {
         const auto& obj = objs[i];

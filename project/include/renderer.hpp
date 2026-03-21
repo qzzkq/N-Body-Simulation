@@ -81,7 +81,7 @@ private:
 
     glm::mat4 viewMatrix_; 
     glm::mat4 projectionMatrix_; 
-    float farPlane_ = 500.0f;
+    float farPlane_ = 1.0e10f;
     
     bool successInit_ = false; 
 };

@@ -7,6 +7,7 @@
 #include <glm/glm.hpp>
 #include "H5Cpp.h"
 #include "object.hpp"
+#include "graphic_state.hpp"
 
 struct Particle {
     glm::dvec3 position;
@@ -35,7 +36,8 @@ bool LoadObjectsFromFile(const std::string& filePath,
                          std::vector<Object>& outObjs);
 
 bool LoadSystemFromTextFile(const std::string& filePath,
-                            std::vector<Object>& outObjs);
+                            std::vector<Object>& outObjs,
+                            std::vector<GraphicState>* outGraphics = nullptr);
 
 bool SaveSystemToTextFile(const std::string& filePath,
                           const std::vector<Object>& objs);
