@@ -156,7 +156,29 @@ int main(int argc, char** argv) {
         return 1;
     }
     graphics.resize(objs.size());
-    physics::colorFromMass(objs, graphics);
+    bool loadedReplayColors = false;
+    try {
+        DataSet colorSet = file.openDataSet("body_colors");
+        DataSpace csp = colorSet.getSpace();
+        int crank = csp.getSimpleExtentNdims();
+        if (crank == 2) {
+            hsize_t cdims[2] = {0, 0};
+            csp.getSimpleExtentDims(cdims);
+            if (cdims[0] == static_cast<hsize_t>(numBodies) && cdims[1] == 4) {
+                std::vector<float> cbuf(numBodies * 4);
+                colorSet.read(cbuf.data(), PredType::NATIVE_FLOAT);
+                for (size_t i = 0; i < numBodies; ++i) {
+                    graphics[i].color = glm::vec4(
+                        cbuf[i * 4 + 0], cbuf[i * 4 + 1], cbuf[i * 4 + 2], cbuf[i * 4 + 3]);
+                }
+                loadedReplayColors = true;
+            }
+        }
+    } catch (...) {
+    }
+    if (!loadedReplayColors) {
+        physics::colorFromMass(objs, graphics);
+    }
 
     DataSet tracksSet;
     try {

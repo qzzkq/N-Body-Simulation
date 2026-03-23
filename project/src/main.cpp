@@ -7,6 +7,7 @@
 #include <iostream>
 #include <optional>
 #include <cmath>
+#include <iomanip>
 #include <algorithm>
 #include <filesystem>
 #include <csignal>
@@ -40,7 +41,6 @@
 
 double gSimTime = 0.0;
 double fixedDt = 1.0 / 3652.5; // шаг времени;
-const int FIXED_STEPS = 10;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
@@ -160,8 +160,12 @@ int main() {
             std::cout << "Выберите номер файла: " << std::flush;
             size_t idx = 0;
             std::cin >> idx;
-            if (LoadObjectsFromFile(files[idx-1], "Particles", objs)) {
+            bool h5HasColors = false;
+            if (LoadObjectsFromFile(files[idx-1], "Particles", objs, &graphics, &h5HasColors)) {
                 loaded = true;
+                if (h5HasColors) {
+                    loadedColorsFromTxt = true;
+                }
                 std::cout << "Loaded " << objs.size() << " objects\n";
             }
 
@@ -221,10 +225,21 @@ if (!loaded) {
     std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
     std::string filename;
     std::cin >> filename;
+
+    int saveIntervalSteps = 10;
+    std::cout << "Как часто сохранять кадры в HDF5? Целое N >= 1: каждый N-й шаг интеграции "
+                 "(1 = каждый шаг, 10 = раз в 10 шагов).\nN = " << std::flush;
+    std::cin >> saveIntervalSteps;
+    if (saveIntervalSteps < 1) {
+        std::cout << "N < 1, используем N = 1.\n";
+        saveIntervalSteps = 1;
+    }
+
     std::filesystem::create_directories("data");
-    H5::H5File framesFile = CreateSimulationFile("data/" + filename + ".h5", objs.size(), fixedDt * FIXED_STEPS);
+    H5::H5File framesFile = CreateSimulationFile("data/" + filename + ".h5", objs.size(),
+                                               fixedDt * static_cast<double>(saveIntervalSteps));
     std::size_t frameIndex = 0;
-    WriteSimulationFrame(framesFile, objs, frameIndex);
+    WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
     ++frameIndex;
     // Чтение с HDF5
 
@@ -282,7 +297,6 @@ if (!loaded) {
                 for (std::size_t i = 0; i < objs.size(); ++i) {
                     graphics[i].updateTrail(objs[i].position);
                 }
-                renderer.renderFrame(objs, graphics, cam);
             }
             if (substeps >= MAX_SUBSTEPS) {
                 accumulator = 0.0;
@@ -294,7 +308,7 @@ if (!loaded) {
 
             control.updateCameraFromKeys();
 
-            //renderer.renderFrame(objs, graphics, cam);
+            renderer.renderFrame(objs, graphics, cam);
             ++frameCounter;
             if (frameCounter % 100 == 0) {
                 // simulationStep(objs, 0.0, true, true);
@@ -320,8 +334,37 @@ if (!loaded) {
     } else {
         int startTime = static_cast<int>(time(NULL));
         double targetTime;
-        std::cout << "На какое время просчитываем? (сек): " << std::flush;
+        {
+            const double yearsBetweenSaves = fixedDt * static_cast<double>(saveIntervalSteps);
+            const double mbPerSimYear =
+                (yearsBetweenSaves > 0.0 && !objs.empty())
+                    ? (static_cast<double>(objs.size()) * 3.0 * static_cast<double>(sizeof(float))
+                       / (yearsBetweenSaves * 1024.0 * 1024.0))
+                    : 0.0;
+            constexpr double kSecPerYear = 365.25 * 86400.0;
+            std::cout << std::fixed << std::setprecision(6);
+            std::cout << "Просчёт (не в реальном времени). Один шаг dt = " << fixedDt << " года.\n";
+            std::cout << "Между сохранёнными кадрами: " << yearsBetweenSaves << " года ("
+                      << saveIntervalSteps << " шаг(ов)). Ориентир размера треков: ~" << std::setprecision(3)
+                      << mbPerSimYear << " МБ на 1 год симуляции, ~" << std::setprecision(6)
+                      << " (оценка по float-позициям; deflate в HDF5 обычно меньше).\n";
+            std::cout << std::setprecision(15);
+            std::cout << "На какое симуляционное время просчитываем? (годы): " << std::flush;
+        }
         std::cin >> targetTime;
+        {
+            const double yearsBetweenSaves = fixedDt * static_cast<double>(saveIntervalSteps);
+            const double mbPerSimYear =
+                (yearsBetweenSaves > 0.0 && !objs.empty())
+                    ? (static_cast<double>(objs.size()) * 3.0 * static_cast<double>(sizeof(float))
+                       / (yearsBetweenSaves * 1024.0 * 1024.0))
+                    : 0.0;
+            if (targetTime > 0.0 && mbPerSimYear > 0.0) {
+                std::cout << std::fixed << std::setprecision(2)
+                          << "Ориентир объёма треков на весь прогон: ~" << (mbPerSimYear * targetTime)
+                          << " МБ (грубо, без учёта initial_data и сжатия).\n";
+            }
+        }
         double bakeStartRealTime = glfwGetTime();
 
         glfwSwapInterval(0);
@@ -359,8 +402,8 @@ if (!loaded) {
                       progress, etaMin, etaSec, gSimTime, targetTime, frameIndex);
                 glfwSetWindowTitle(renderer.getWindow(), title);
             }
-            if (stepCounter % FIXED_STEPS == 0) {
-                WriteSimulationFrame(framesFile, objs, frameIndex);
+            if (stepCounter % saveIntervalSteps == 0) {
+                WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
                 ++frameIndex;
             }
         }

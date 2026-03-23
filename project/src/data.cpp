@@ -19,17 +19,51 @@
 using namespace H5;
 namespace fs = std::filesystem;
 
+struct ParticleLegacy {
+    glm::dvec3 position;
+    glm::dvec3 velocity;
+    double     mass;
+    double     radius;
+};
+
+static CompType MakeParticleLegacyType()
+{
+    hsize_t v3dims[1] = {3};
+    ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+
+    CompType t(sizeof(ParticleLegacy));
+    t.insertMember("position", HOFFSET(ParticleLegacy, position), vec3Type);
+    t.insertMember("velocity", HOFFSET(ParticleLegacy, velocity), vec3Type);
+    t.insertMember("mass",     HOFFSET(ParticleLegacy, mass),     PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   HOFFSET(ParticleLegacy, radius),   PredType::NATIVE_DOUBLE);
+    return t;
+}
+
 static CompType MakeParticleType()
 {
     hsize_t v3dims[1] = {3};
     ArrayType vec3Type(PredType::NATIVE_DOUBLE, 1, v3dims);
+    hsize_t v4dims[1] = {4};
+    ArrayType vec4Type(PredType::NATIVE_FLOAT, 1, v4dims);
 
     CompType t(sizeof(Particle));
     t.insertMember("position", HOFFSET(Particle, position), vec3Type);
     t.insertMember("velocity", HOFFSET(Particle, velocity), vec3Type);
     t.insertMember("mass",     HOFFSET(Particle, mass),     PredType::NATIVE_DOUBLE);
     t.insertMember("radius",   HOFFSET(Particle, radius),   PredType::NATIVE_DOUBLE);
+    t.insertMember("color",    HOFFSET(Particle, color),    vec4Type);
     return t;
+}
+
+static bool CompoundHasMember(const CompType& ct, const char* name)
+{
+    const int n = ct.getNmembers();
+    for (int i = 0; i < n; ++i) {
+        if (ct.getMemberName(i) == name) {
+            return true;
+        }
+    }
+    return false;
 }
 
 static CompType& GetParticleType()
@@ -64,7 +98,8 @@ void Writer(const std::string& fileName,
 }
 
 std::vector<Particle> Reader(const std::string& fileName,
-                             const std::string& dsetName)
+                             const std::string& dsetName,
+                             bool* outFileHadColorMember)
 {
     try {
         H5File file(fileName, H5F_ACC_RDONLY);
@@ -82,8 +117,29 @@ std::vector<Particle> Reader(const std::string& fileName,
 
         std::vector<Particle> result(count);
         if (count > 0) {
-            CompType& type = GetParticleType();
-            dset.read(result.data(), type);
+            CompType fileCompound(dset);
+            const bool hasColor = CompoundHasMember(fileCompound, "color");
+            if (outFileHadColorMember != nullptr) {
+                *outFileHadColorMember = hasColor;
+            }
+
+            if (hasColor) {
+                CompType& type = GetParticleType();
+                dset.read(result.data(), type);
+            } else {
+                std::vector<ParticleLegacy> legacy(count);
+                static CompType legType = MakeParticleLegacyType();
+                dset.read(legacy.data(), legType);
+                for (std::size_t i = 0; i < count; ++i) {
+                    result[i].position = legacy[i].position;
+                    result[i].velocity = legacy[i].velocity;
+                    result[i].mass     = legacy[i].mass;
+                    result[i].radius   = legacy[i].radius;
+                    result[i].color    = glm::vec4(1.0f);
+                }
+            }
+        } else if (outFileHadColorMember != nullptr) {
+            *outFileHadColorMember = false;
         }
 
         return result;
@@ -126,11 +182,14 @@ std::vector<std::string> ListH5Files(const std::string& dir)
 
 bool LoadObjectsFromFile(const std::string& filePath,
                          const std::string& dsetName,
-                         std::vector<Object>& outObjs)
+                         std::vector<Object>& outObjs,
+                         std::vector<GraphicState>* outGraphics,
+                         bool* outHadColorInFile)
 {
     std::vector<Particle> parts;
+    bool hadColorMember = false;
     try {
-        parts = Reader(filePath, dsetName);
+        parts = Reader(filePath, dsetName, &hadColorMember);
     }
     catch (const std::exception& e) {
         std::cerr << "LoadObjectsFromFile: failed to read HDF5: "
@@ -141,6 +200,22 @@ bool LoadObjectsFromFile(const std::string& filePath,
     if (parts.empty()) {
         std::cerr << "LoadObjectsFromFile: dataset is empty\n";
         return false;
+    }
+
+    if (outHadColorInFile != nullptr) {
+        *outHadColorInFile = hadColorMember;
+    }
+
+    if (outGraphics != nullptr) {
+        outGraphics->clear();
+        if (hadColorMember) {
+            outGraphics->reserve(parts.size());
+            for (const auto& p : parts) {
+                GraphicState gs;
+                gs.color = p.color;
+                outGraphics->push_back(std::move(gs));
+            }
+        }
     }
 
     outObjs.clear();
@@ -397,11 +472,18 @@ H5::H5File CreateSimulationFile(const std::string& fileName, std::size_t numBodi
         file.createDataSet("tracks", GetTrackType(), tracksSpace, prop);
     }
 
+    {
+        hsize_t colorDims[2] = {nb, 4};
+        DataSpace colorSpace(2, colorDims);
+        file.createDataSet("body_colors", PredType::NATIVE_FLOAT, colorSpace);
+    }
+
     file.flush(H5F_SCOPE_GLOBAL);
     return file;
 }
 
-void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std::size_t frameIndex)
+void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs,
+                          const std::vector<GraphicState>& graphics, std::size_t frameIndex)
 {
     if (objs.empty()) return;
     hsize_t numBodies = static_cast<hsize_t>(objs.size());
@@ -415,6 +497,18 @@ void WriteSimulationFrame(H5::H5File& file, const std::vector<Object>& objs, std
             buffer[i].radius   = objs[i].radius;
         }
         dset.write(buffer.data(), GetInitType());
+
+        DataSet colorDset = file.openDataSet("body_colors");
+        const std::size_t n = objs.size();
+        std::vector<float> colorFlat(n * 4);
+        for (std::size_t i = 0; i < n; ++i) {
+            const glm::vec4 c = (i < graphics.size()) ? graphics[i].color : glm::vec4(1.0f);
+            colorFlat[i * 4 + 0] = c.r;
+            colorFlat[i * 4 + 1] = c.g;
+            colorFlat[i * 4 + 2] = c.b;
+            colorFlat[i * 4 + 3] = c.a;
+        }
+        colorDset.write(colorFlat.data(), PredType::NATIVE_FLOAT);
     }
 
     DataSet dset = file.openDataSet("tracks");
