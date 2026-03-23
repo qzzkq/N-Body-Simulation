@@ -13,13 +13,13 @@ NVCC := nvcc
 USE_CUDA ?= 1
 CUDA_ARCH ?= -arch=sm_75
 
-OPT_FLAGS := -O3 -march=native -ffast-math -flto
+OPT_FLAGS := -O3 -march=native -ffast-math -flto -fopenmp
 
 PKG_LIBS  := $(shell pkg-config --cflags --libs glew glfw3)
 DEPFLAGS  := -MMD -MP
 
 CXXFLAGS  := $(OPT_FLAGS) -std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) $(DEPFLAGS)
-LIBS      := $(PKG_LIBS) -lGL
+LIBS      := $(PKG_LIBS) -lGL -fopenmp
 
 ifeq ($(USE_CUDA),1)
     NVCCFLAGS := -O3 $(CUDA_ARCH) --std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) -MD

@@ -16,6 +16,7 @@ struct Particle {
     glm::dvec3 velocity;
     double     mass;
     double     radius;
+    glm::vec4  color{1.0f, 1.0f, 1.0f, 1.0f};
 };
 
 std::vector<Object> objs = {};
@@ -30,31 +31,38 @@ static inline double radiusFromMassDensity(double m, double rho) {
 static CompType MakeFileType() {
     hsize_t v3[1] = {3};
     ArrayType vec3T(PredType::NATIVE_DOUBLE, 1, v3);
+    hsize_t v4[1] = {4};
+    ArrayType vec4T(PredType::NATIVE_FLOAT, 1, v4);
 
-    constexpr size_t D    = sizeof(double);
-    constexpr size_t POS  = 0;          
-    constexpr size_t VEL  = POS + 3*D;  
-    constexpr size_t MASS = VEL + 3*D;  
-    constexpr size_t RAD  = MASS + D;   
-    constexpr size_t SIZE = RAD + D;    
+    constexpr size_t D     = sizeof(double);
+    constexpr size_t POS   = 0;
+    constexpr size_t VEL   = POS + 3 * D;
+    constexpr size_t MASS  = VEL + 3 * D;
+    constexpr size_t RAD   = MASS + D;
+    constexpr size_t COLOR = RAD + D;
+    constexpr size_t SIZE  = COLOR + 4 * sizeof(float);
 
     CompType t(SIZE);
-    t.insertMember("position", POS,  vec3T);
-    t.insertMember("velocity", VEL,  vec3T);
-    t.insertMember("mass",     MASS, PredType::NATIVE_DOUBLE);
-    t.insertMember("radius",   RAD,  PredType::NATIVE_DOUBLE);
+    t.insertMember("position", POS,   vec3T);
+    t.insertMember("velocity", VEL,   vec3T);
+    t.insertMember("mass",     MASS,  PredType::NATIVE_DOUBLE);
+    t.insertMember("radius",   RAD,   PredType::NATIVE_DOUBLE);
+    t.insertMember("color",    COLOR, vec4T);
     return t;
 }
 
 static CompType MakeMemType() {
     hsize_t v3[1] = {3};
     ArrayType vec3T(PredType::NATIVE_DOUBLE, 1, v3);
+    hsize_t v4[1] = {4};
+    ArrayType vec4T(PredType::NATIVE_FLOAT, 1, v4);
 
     CompType t(sizeof(Particle));
     t.insertMember("position", HOFFSET(Particle, position), vec3T);
     t.insertMember("velocity", HOFFSET(Particle, velocity), vec3T);
     t.insertMember("mass",     HOFFSET(Particle, mass),     PredType::NATIVE_DOUBLE);
     t.insertMember("radius",   HOFFSET(Particle, radius),   PredType::NATIVE_DOUBLE);
+    t.insertMember("color",    HOFFSET(Particle, color),    vec4T);
     return t;
 }
 

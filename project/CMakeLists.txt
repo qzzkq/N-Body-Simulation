@@ -3,6 +3,9 @@ project(NBodySimulation LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
+endif()
 
 include(GNUInstallDirs)
 
@@ -29,7 +32,8 @@ if(CMAKE_CUDA_COMPILER)
     enable_language(CUDA)
     find_package(CUDAToolkit REQUIRED)
     add_compile_definitions(USE_CUDA)
-    file(GLOB CUDA_SOURCES "src/*.cu")
+    # Реализации CUDA могут лежать не только в src/.
+    file(GLOB CUDA_SOURCES "src/*.cu" "algo/*.cu")
 else()
     set(CUDA_SOURCES "")
 endif()
@@ -77,7 +81,11 @@ endif()
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(Core PUBLIC CUDA::cudart)
-    set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES native)
+    set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES "60;70;80;86")
+endif()
+
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ffast-math")
 endif()
 
 # ---------------------------------------------------------
