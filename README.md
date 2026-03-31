@@ -2,6 +2,8 @@
 
 Полный комплект проектных материалов, включая спецификации и отчетную документацию, систематизирован в соответствующем разделе [Документов на Wiki](https://github.com/qzzkq/N-Body-Simulation/wiki/Documents).
 
+Task Board: https://docs.google.com/spreadsheets/d/1YdOAar_n0IAbJ7-DTdb0oKI_YG6NAOOX/edit?gid=282472467#gid=282472467
+
 # N-body Simulation (CPU / Barnes–Hut / CUDA)
 
 Интерактивный 3D-симулятор гравитационного **N-body** на **C++17** с визуализацией через **OpenGL**.
