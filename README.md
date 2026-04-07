@@ -2,7 +2,7 @@
 
 Полный комплект проектных материалов, включая спецификации и отчетную документацию, систематизирован в соответствующем разделе [Документов на Wiki](https://github.com/qzzkq/N-Body-Simulation/wiki/Documents).
 
-[Task Board](https://github.com/users/Yojik1-cpu/projects/1)
+[Task Board](https://github.com/users/qzzkq/projects/1/views/1)
 
 # N-body Simulation (CPU / Barnes–Hut / CUDA)
 
