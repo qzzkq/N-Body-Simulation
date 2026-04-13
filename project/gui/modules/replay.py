@@ -20,8 +20,10 @@ class RoundedButton(tk.Canvas):
     def __init__(self, parent, text, command=None, width=200, height=46,
                  bg_color="#3d9de0", bg_hover="#5ab0f0",
                  text_color="#ffffff", font=None, **kw):
+        if "bg" not in kw:
+            kw["bg"] = parent["bg"]
         super().__init__(parent, width=width, height=height,
-                         highlightthickness=0, cursor="hand2", **kw)
+                         highlightthickness=0, bd=0, relief="flat", cursor="hand2", **kw)
         self._text     = text
         self._command  = command
         self._bg       = bg_color
@@ -44,7 +46,7 @@ class RoundedButton(tk.Canvas):
         self.create_arc(0, 0, r*2, h,     start=90,  extent=180, fill=col, outline="")
         self.create_arc(w-r*2, 0, w, h,   start=270, extent=180, fill=col, outline="")
         self.create_rectangle(r, 0, w-r, h, fill=col, outline="")
-        self.create_text(w//2, h//2, text=self._text, fill=self._tc, font=self._font)
+        self.create_text(w//2, h//2, text=self._text, fill=self._tc, font=self._font, anchor="center")
 
     def _hover(self, state: bool):
         self._hovered = state
@@ -54,12 +56,13 @@ class RoundedButton(tk.Canvas):
 class RoundedEntry(tk.Canvas):
     """Поле ввода со скруглёнными краями — как в макете."""
     def __init__(self, parent, palette: dict, width=520, height=52, **kw):
+        if "bg" not in kw:
+            kw["bg"] = parent["bg"]
         super().__init__(parent, width=width, height=height,
-                         highlightthickness=0, **kw)
+                         highlightthickness=0, bd=0, relief="flat", **kw)
         self._pal = palette
         self._bg_c = "#12141e"
         self.bind("<Configure>", self._draw_bg)
-        # настоящий Entry поверх canvas
         self._var = tk.StringVar()
         self._inner = tk.Entry(
             self, textvariable=self._var,
@@ -68,7 +71,6 @@ class RoundedEntry(tk.Canvas):
             relief="flat", font=("Helvetica Neue", 12),
             justify="center",
         )
-        # размещаем Entry внутри canvas через window
         self._win_id = None
         self.bind("<Configure>", self._on_cfg)
         self._draw_bg()
@@ -92,11 +94,9 @@ class RoundedEntry(tk.Canvas):
         r = h // 2
         col = self._bg_c
         bdr = self._pal["border"]
-        # граница
         self.create_arc(0, 0, r*2, h,   start=90,  extent=180, fill=bdr, outline="", tags="bg")
         self.create_arc(w-r*2, 0, w, h, start=270, extent=180, fill=bdr, outline="", tags="bg")
         self.create_rectangle(r, 0, w-r, h, fill=bdr, outline="", tags="bg")
-        # заливка (чуть меньше)
         m = 1
         self.create_arc(m, m, r*2-m, h-m,       start=90,  extent=180, fill=col, outline="", tags="bg")
         self.create_arc(w-r*2+m, m, w-m, h-m,   start=270, extent=180, fill=col, outline="", tags="bg")
@@ -123,23 +123,20 @@ class PlayPage(tk.Frame):
 
     # ════════════════════════════════════════════════════════
     def _build(self):
-        # Центральный блок — вертикальный стек
         center = tk.Frame(self, bg=self.pal["bg"])
         center.place(relx=0.5, rely=0.42, anchor="center")
 
         # ── «Put the path» ────────────────────────────────
-        hdr_frame = tk.Frame(center, bg=self.pal["border"],
-                             highlightthickness=0)
-        hdr_frame.pack()
-
-        # скруглённый «заголовок-таблетка» как в макете
-        hdr_canvas = tk.Canvas(hdr_frame, width=300, height=42,
-                               bg=self.pal["bg"], highlightthickness=0)
-        hdr_canvas.pack()
-        self._draw_pill(hdr_canvas, "Put the path",
-                        bg=self.pal["border"],
-                        text_color=self.pal["text"],
-                        font=("Helvetica Neue", 13, "bold"))
+        ctk.CTkLabel(
+            center, 
+            text="Put the path",
+            fg_color=self.pal["border"],   
+            text_color=self.pal["text"],   
+            font=ctk.CTkFont(family="Helvetica Neue", size=14, weight="bold"),
+            width=300, 
+            height=46, 
+            corner_radius=23              
+        ).pack(pady=(0, 6))
 
         # ── Поле ввода ────────────────────────────────────
         entry_row = tk.Frame(center, bg=self.pal["bg"])
@@ -199,7 +196,7 @@ class PlayPage(tk.Frame):
                           fill=bg, outline="")
         canvas.create_rectangle(r, 0, w-r, h, fill=bg, outline="")
         canvas.create_text(w//2, h//2, text=text,
-                           fill=text_color, font=font)
+                           fill=text_color, font=font, anchor="center")
 
     # ── Browse ────────────────────────────────────────────
     def _browse(self):
@@ -244,6 +241,10 @@ class PlayPage(tk.Frame):
     # ── Start ─────────────────────────────────────────────
     def _on_start(self):
         path = self.path_entry.get().strip()
+        path = path.strip().replace('"', '') 
+        if not os.path.exists(path):
+            self.meta_lbl.configure(text="Error: File not found!", fg="#f87171")
+            return
         build = self.config.get("build_dir", "build")
         rep   = self.config.get("replay_bin", "Replay")
         if not path:

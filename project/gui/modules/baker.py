@@ -32,8 +32,12 @@ class RoundedButton(tk.Canvas):
     def __init__(self, parent, text, command=None, width=130, height=42,
                  bg_color="#3d9de0", bg_hover="#5ab0f0",
                  text_color="#ffffff", font=None, **kw):
+        
+        parent_bg = parent.cget("bg") if hasattr(parent, "cget") else "#080b12"
+        
         super().__init__(parent, width=width, height=height,
-                         highlightthickness=0, cursor="hand2", **kw)
+                         highlightthickness=0, bd=0, bg=parent_bg, cursor="hand2", **kw)
+        
         self._text      = text
         self._command   = command
         self._bg        = bg_color
@@ -53,7 +57,6 @@ class RoundedButton(tk.Canvas):
                self.winfo_height() or int(self["height"])
         r   = h // 2
         col = self._bg_hover if self._hovered else self._bg
-        # рисуем скруглённый прямоугольник
         self.create_arc(0, 0, r*2, h, start=90, extent=180, fill=col, outline="")
         self.create_arc(w - r*2, 0, w, h, start=270, extent=180, fill=col, outline="")
         self.create_rectangle(r, 0, w - r, h, fill=col, outline="")
@@ -156,11 +159,12 @@ class CalculatePage(tk.Frame):
 
     # ════════════════════════════════════════════════════════
     def _build(self):
-        # ── Сетка 2×2 ────────────────────────────────────────
         grid = tk.Frame(self, bg=self.pal["bg"])
         grid.place(relx=0.03, rely=0.04, relwidth=0.94, relheight=0.86)
-        grid.grid_rowconfigure(0, weight=1)
-        grid.grid_rowconfigure(1, weight=1)
+        
+        grid.grid_rowconfigure(0, weight=0) 
+        grid.grid_rowconfigure(1, weight=50) 
+        
         grid.grid_columnconfigure(0, weight=1)
         grid.grid_columnconfigure(1, weight=1)
 
@@ -184,14 +188,42 @@ class CalculatePage(tk.Frame):
         self._build_bottom_bar()
 
     # ──────────────────────────────────────────────────────
-    def _build_panel_algo(self, p: Panel):
+    def _build_panel_algo(self, p):
         p.section("Algorithm")
-        self.algo_var = tk.StringVar(value="2")
-        p.radio_group(self.algo_var, ALGORITHMS)
+        self.algo_var = tk.StringVar(value=ALGORITHMS[0][1])
+        
+        f_alg = ctk.CTkFrame(p, fg_color="transparent")
+        f_alg.pack(fill="x", padx=14, pady=0)
+        
+        for label, val in ALGORITHMS:
+            ctk.CTkRadioButton(
+                f_alg, text=label, variable=self.algo_var, value=val,
+                text_color="#ffffff", fg_color="#3d9de0", hover_color="#5ab0f0",
+                font=ctk.CTkFont(family="Helvetica Neue", size=11),
+                radiobutton_width=14, 
+                radiobutton_height=14,    
+                border_width_unchecked=2,
+                border_width_checked=4
+            ).pack(anchor="w", pady=2)   
+
         p.separator()
+
         p.section("Render mode")
-        self.render_var = tk.StringVar(value="1")
-        p.radio_group(self.render_var, RENDER_MODES)
+        self.render_var = tk.StringVar(value=RENDER_MODES[0][1])
+        
+        f_ren = ctk.CTkFrame(p, fg_color="transparent")
+        f_ren.pack(fill="x", padx=14, pady=0)
+        
+        for label, val in RENDER_MODES:
+            ctk.CTkRadioButton(
+                f_ren, text=label, variable=self.render_var, value=val,
+                text_color="#ffffff", fg_color="#3d9de0", hover_color="#5ab0f0",
+                font=ctk.CTkFont(family="Helvetica Neue", size=11),
+                radiobutton_width=14,
+                radiobutton_height=14,
+                border_width_unchecked=2,
+                border_width_checked=4
+            ).pack(side="left", padx=(0, 10), pady=2) 
 
     def _build_panel_source(self, p: Panel):
         p.section("Initial conditions")
@@ -204,7 +236,7 @@ class CalculatePage(tk.Frame):
         for i, s in enumerate(SOURCES):
             lbl = s.split("(")[0].strip()
             btn = RoundedButton(
-                seg_frame, text=lbl, width=88, height=28,
+                seg_frame, text=lbl, width=150, height=28,
                 bg_color=self.pal["border"],
                 bg_hover="#3a3f55",
                 text_color=self.pal["text"],
@@ -436,14 +468,18 @@ class CalculatePage(tk.Frame):
 
     # ════════════════════════════════════════════════════════
     def _on_start(self):
-        """Собрать флаги и показать в Output-панели."""
+        render_code = self.render_var.get()
+        algo_code   = self.algo_var.get()
+
         src = self.source_var.get()
         src_idx = str(SOURCES.index(src))
 
+        render_name = next((n for n, c in RENDER_MODES if c == render_code), "?")
+        algo_name   = next((n for n, c in ALGORITHMS if c == algo_code), "?")
+
         stdin: list[tuple[str, str]] = [
-            (self.render_var.get(),  f"render_mode  →  {dict(RENDER_MODES).get(self.render_var.get(), '?')}... "
-                                     f"(0=Cubes 1=Sphere 2=Points)"),
-            (self.algo_var.get(),    f"algorithm    →  {dict(ALGORITHMS).get(self.algo_var.get(), '?')}"),
+            (render_code,  f"render_mode  →  {render_name} (0=Cubes 1=Sphere 2=Points)"),
+            (algo_code,    f"algorithm    →  {algo_name}"),
             (self.dt_entry.get(),    f"dt           →  {self.dt_entry.get()} years/step"),
             (src_idx,                f"source       →  {src}"),
         ]
@@ -469,8 +505,8 @@ class CalculatePage(tk.Frame):
         for val, desc in stdin:
             lines.append(f"  {val:<22}  # {desc}")
         lines += ["", "─── future CLI flags ─────────────────",
-                  f"  ./Simulate --render {self.render_var.get()} \\",
-                  f"    --algo {self.algo_var.get()} --dt {self.dt_entry.get()} \\",
+                  f"  ./Simulate --render {render_code} \\",
+                  f"    --algo {algo_code} --dt {self.dt_entry.get()} \\",
                   f"    --source {src_idx} --output {outfile}"]
         self._set_result("\n".join(lines))
         self.status_lbl.configure(text="Flags generated  (launch not implemented yet)")
