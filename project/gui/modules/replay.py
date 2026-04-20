@@ -5,6 +5,7 @@ Play Page — starfield-фон, по центру «Put the path» + поле в
 """
 
 import os
+import subprocess
 from tkinter import filedialog
 import tkinter as tk
 import customtkinter as ctk
@@ -240,21 +241,25 @@ class PlayPage(tk.Frame):
 
     # ── Start ─────────────────────────────────────────────
     def _on_start(self):
-        path = self.path_entry.get().strip()
-        path = path.strip().replace('"', '') 
-        if not os.path.exists(path):
-            self.meta_lbl.configure(text="Error: File not found!", fg="#f87171")
-            return
-        build = self.config.get("build_dir", "build")
-        rep   = self.config.get("replay_bin", "Replay")
+        path = self.path_entry.get().strip().replace('"', '') 
+        
         if not path:
-            self.meta_lbl.configure(text="Specify a .h5 file first")
+            self.meta_lbl.configure(text="Сначала выберите .h5 файл")
             return
-        meta_str = ""
-        if self._meta:
-            meta_str = (f"\n  bodies={self._meta['bodies']}  "
-                        f"frames={self._meta['frames']}  "
-                        f"duration={self._meta['duration']:.2f} yr")
-        self.meta_lbl.configure(
-            text=f"Command:\n  ./{build}/{rep} {path}{meta_str}\n"
-                 f"\n  ⚠ Real launch not implemented yet.")
+            
+        if not os.path.exists(path):
+            self.meta_lbl.configure(text="Ошибка: Файл не найден!", fg="#f87171")
+            return
+            
+        binary_name = self.config.get("replay_bin", "replay")
+        binary_path = os.path.join(self.project_root, binary_name)
+        
+        if not os.path.exists(binary_path):
+            self.meta_lbl.configure(text=f"Ошибка: Исполняемый файл '{binary_name}' не найден.", fg="#f87171")
+            return
+            
+        self.meta_lbl.configure(text="Запуск Replay...")
+        
+        # replay.cpp ожидает путь к файлу первым аргументом без флагов
+        cmd = [binary_path, path]
+        subprocess.Popen(cmd, cwd=self.project_root)

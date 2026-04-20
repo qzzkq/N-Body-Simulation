@@ -8,8 +8,8 @@ import os
 
 _DEFAULTS = {
     "build_dir":        "build",
-    "simulate_bin":     "Simulate",
-    "replay_bin":       "Replay",
+    "simulate_bin":     "nBodySim",
+    "replay_bin":       "replay",
     "data_dir":         "data",
     "default_dt":       "0.000273785",
     "default_save_n":   "10",

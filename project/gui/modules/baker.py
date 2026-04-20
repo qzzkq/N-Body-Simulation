@@ -9,6 +9,8 @@ Calculate Page — 4 панели на starfield-фоне + прогресс-б�
 """
 
 import os
+import subprocess
+import threading
 from tkinter import filedialog
 import tkinter as tk
 import customtkinter as ctk
@@ -468,50 +470,79 @@ class CalculatePage(tk.Frame):
 
     # ════════════════════════════════════════════════════════
     def _on_start(self):
-        render_code = self.render_var.get()
-        algo_code   = self.algo_var.get()
-
-        src = self.source_var.get()
-        src_idx = str(SOURCES.index(src))
-
-        render_name = next((n for n, c in RENDER_MODES if c == render_code), "?")
-        algo_name   = next((n for n, c in ALGORITHMS if c == algo_code), "?")
-
-        stdin: list[tuple[str, str]] = [
-            (render_code,  f"render_mode  →  {render_name} (0=Cubes 1=Sphere 2=Points)"),
-            (algo_code,    f"algorithm    →  {algo_name}"),
-            (self.dt_entry.get(),    f"dt           →  {self.dt_entry.get()} years/step"),
-            (src_idx,                f"source       →  {src}"),
-        ]
-        if src == SOURCES[0]:
-            stdin.append((self.h5_var.get(), f"h5_file      →  {self.h5_var.get()}"))
-        elif src == SOURCES[1]:
-            stdin.append((self.txt_entry.get(), f"txt_path     →  {self.txt_entry.get()}"))
-        else:
-            stdin.append((self.rand_count.get(), f"body_count   →  {self.rand_count.get()}"))
-            stdin.append((self.scenario_var.get(), f"scenario     →  {SCENARIOS[int(self.scenario_var.get())-1]}"))
-
+        render_code = str(self.render_var.get())
+        algo_code   = str(self.algo_var.get())
+        
+        src_val = self.source_var.get()
+        src_idx = SOURCES.index(src_val) if src_val in SOURCES else int(src_val)
+        
         outfile = self.outfile_entry.get().strip() or "frames"
         is_rt   = self.rt_var.get()
-        stdin += [
-            (outfile,                f"output       →  data/{outfile}.h5"),
-            (self.save_n_entry.get(), f"save_every   →  {self.save_n_entry.get()} steps"),
-            ("1" if is_rt else "0",  f"realtime     →  {'yes' if is_rt else 'no (Bake)'}"),
-        ]
-        if not is_rt:
-            stdin.append((self.target_entry.get(), f"target_time  →  {self.target_entry.get()} years"))
+        
+        binary_name = self.config.get("simulate_bin", "nBodySim")
+        binary_path = os.path.join(self.project_root, binary_name)
+        
+        if not os.path.exists(binary_path):
+            self._set_result(f"Ошибка: Файл '{binary_name}' не найден. Скомпилируй через make.")
+            return
 
-        lines = ["─── stdin sequence ───────────────────"]
-        for val, desc in stdin:
-            lines.append(f"  {val:<22}  # {desc}")
-        lines += ["", "─── future CLI flags ─────────────────",
-                  f"  ./Simulate --render {render_code} \\",
-                  f"    --algo {algo_code} --dt {self.dt_entry.get()} \\",
-                  f"    --source {src_idx} --output {outfile}"]
-        self._set_result("\n".join(lines))
-        self.status_lbl.configure(text="Flags generated  (launch not implemented yet)")
-        self._progress = 0.0
-        self._pb_pct_lbl.configure(text="0%")
+        cmd = [
+            binary_path,
+            "--render", render_code,
+            "--algo", algo_code,
+            "--dt", self.dt_entry.get(),
+            "--source", str(src_idx),
+            "--output", outfile,
+            "--save_every", self.save_n_entry.get(),
+            "--realtime", "1" if is_rt else "0"
+        ]
+
+        if src_idx == 0:
+            cmd.extend(["--h5", self.h5_var.get()])
+        elif src_idx == 1:
+            cmd.extend(["--txt", self.txt_entry.get()])
+        else:
+            cmd.extend(["--bodies", self.rand_count.get()])
+            scen_idx = int(self.scenario_var.get()) - 1
+            cmd.extend(["--scenario", str(scen_idx)])
+
+        if not is_rt:
+            cmd.extend(["--target", self.target_entry.get()])
+
+        self._set_result(f"Запуск симуляции...\n{' '.join(cmd)}")
+        self.status_lbl.configure(text="Simulation running...")
+        
+        self.process = subprocess.Popen(
+            cmd, cwd=self.project_root, stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT, text=True, bufsize=1
+        )
+        threading.Thread(target=self._monitor_process, daemon=True).start()
+
+    
+    def _monitor_process(self):
+        for line in iter(self.process.stdout.readline, ''):
+            line = line.strip()
+            if not line:
+                continue
+                
+            if line.startswith("PROGRESS:"):
+                try:
+                    pct = float(line.split(":")[1])
+                    self.after(0, self._update_progress, pct)
+                except ValueError:
+                    pass
+            else:
+                print(f"[C++] {line}")
+
+        self.process.stdout.close()
+        self.process.wait()
+        
+        self.after(0, lambda: self.status_lbl.configure(text="Simulation finished!"))
+        self.after(0, lambda: self._update_progress(100.0))
+
+    def _update_progress(self, pct):
+        self._progress = pct / 100.0
+        self._pb_pct_lbl.configure(text=f"{pct:.1f}%")
         self._redraw_pb()
 
     # helpers
