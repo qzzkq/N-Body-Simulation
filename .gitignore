@@ -1,3 +1,7 @@
 HDFView
 .vscode
 .idea
+project/gui/venv
+project/gui/config.json
+project/**/__pycache__/
+.DS_Store

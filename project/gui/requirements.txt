@@ -1,0 +1,2 @@
+customtkinter>=5.2.2
+h5py>=3.10.0

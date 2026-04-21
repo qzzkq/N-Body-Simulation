@@ -1,0 +1,5 @@
+# N-Body GUI — добавить в корневой .gitignore проекта
+gui/venv/
+gui/config.json
+gui/__pycache__/
+gui/modules/__pycache__/
