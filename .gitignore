@@ -1,3 +1,5 @@
 HDFView
 .vscode
 .idea
+__pycache__
+docs 
