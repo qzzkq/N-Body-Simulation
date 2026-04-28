@@ -3,3 +3,7 @@ HDFView
 .idea
 __pycache__
 docs 
+project/gui/venv
+project/gui/config.json
+project/**/__pycache__/
+.DS_Store

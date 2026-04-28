@@ -175,18 +175,21 @@ void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<Gr
     static std::vector<glm::vec3> pointPositions;
     static std::vector<glm::vec4> pointColors;
 
-    // Очищаем векторы, но capacity сохраняется (быстро работает)
     modelMatrices.clear(); colors.clear();
     pointPositions.clear(); pointColors.clear();
 
-    const float lodSphereMaxDist = 15000.0f; // Дистанция перехода
+    const float lodSphereMaxDist = 15000.0f; 
 
     for (std::size_t i = 0; i < objs.size(); ++i) {
         glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
         float distance = static_cast<float>(glm::length(relativePos));
 
-        if (distance < lodSphereMaxDist) {
-            // Рисуем как сферу (вблизи)
+        // Если режим Точки ИЛИ объект далеко — рисуем точкой
+        if (mode_ == RenderMode::Points || distance >= lodSphereMaxDist) {
+            pointPositions.push_back(glm::vec3(relativePos));
+            pointColors.push_back(graphics[i].color);
+        } else {
+            // Иначе (Сферы или Кубы вблизи)
             const float farFalloff = 1.0f / (1.0f + distance / 30000.0f);
             float visualScale = std::max(static_cast<float>(objs[i].radius), distance * 0.002f * farFalloff);
 
@@ -196,14 +199,10 @@ void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<Gr
 
             modelMatrices.push_back(M);
             colors.push_back(graphics[i].color);
-        } else {
-            // Рисуем как точку (вдали) - здесь работает твой идеальный шейдер POINT_VS
-            pointPositions.push_back(glm::vec3(relativePos));
-            pointColors.push_back(graphics[i].color);
         }
     }
 
-    // Pass 1: Отрисовка ближних объектов (Сферы)
+    // Отрисовка 3D-геометрии (Кубы или Сферы)
     if (!modelMatrices.empty()) {
         glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
         glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
@@ -211,12 +210,18 @@ void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<Gr
         glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec4), colors.data(), GL_DYNAMIC_DRAW);
 
         glUniform1i(uUseInstancing_, 1);
-        glBindVertexArray(sphereVAO_);
-        glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(sphereVertexCount_), static_cast<GLsizei>(modelMatrices.size()));
+        
+        if (mode_ == RenderMode::Cubes) {
+            glBindVertexArray(cubeVAO_);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 36, static_cast<GLsizei>(modelMatrices.size()));
+        } else {
+            glBindVertexArray(sphereVAO_);
+            glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(sphereVertexCount_), static_cast<GLsizei>(modelMatrices.size()));
+        }
         glBindVertexArray(0);
     }
 
-    // Pass 2: Отрисовка дальних объектов (Точки)
+    //Отрисовка точек
     if (!pointPositions.empty()) {
         glUseProgram(pointProgram_);
         glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);

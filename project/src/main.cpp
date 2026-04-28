@@ -12,6 +12,8 @@
 #include <filesystem>
 #include <csignal>
 #include <array>
+#include <string>
+#include <cstring>
 #include "object.hpp"
 #include "graphic_state.hpp"
 #include "renderer.hpp"
@@ -39,6 +41,23 @@
 #include <windows.h>
 #endif
 
+// Функции для парсинга аргументов командной строки 
+std::string getCmdOption(int argc, char* argv[], const std::string& option, const std::string& default_val = "") {
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == option && i + 1 < argc) {
+            return argv[i + 1];
+        }
+    }
+    return default_val;
+}
+
+bool cmdOptionExists(int argc, char* argv[], const std::string& option) {
+    for (int i = 1; i < argc; ++i) {
+        if (std::string(argv[i]) == option) return true;
+    }
+    return false;
+}
+
 double gSimTime = 0.0;
 double fixedDt = 1.0 / 3652.5; // шаг времени;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
@@ -54,7 +73,7 @@ void signalHandler(int signum) {
     }
 }
 
-int main() {
+int main(int argc, char* argv[]) {
 
     std::signal(SIGINT, signalHandler);
 
@@ -62,6 +81,9 @@ int main() {
     SetConsoleOutputCP(65001);
     SetConsoleCP(65001);
 #endif
+
+    bool is_cli = (argc > 1); // Флаг: запущен ли с аргументами командной строки
+
     bool fullscreen = false;
     bool maximized = true;
 
@@ -83,8 +105,15 @@ int main() {
     bool loaded = false;
     bool loadedColorsFromTxt = false;
     int mode;
-    std::cout << "Кубы/шары/точка [0/1/2]\n";
-    std::cin >> mode;
+    
+    // --- 1. Выбор рендера ---
+    if (!is_cli) {
+        std::cout << "Кубы/шары/точка [0/1/2]\n";
+        std::cin >> mode;
+    } else {
+        mode = std::stoi(getCmdOption(argc, argv, "--render", "1"));
+    }
+
     switch (mode){
         case 0:
             renderMode = RenderMode::Cubes;
@@ -101,19 +130,29 @@ int main() {
     }
     renderer.setRenderMode(renderMode);
 
+    // --- 2. Выбор алгоритма ---
 #ifdef USE_CUDA
-    std::cout << "Выберите алгоритм:\n"
-              << "  [1] Брутфорс (O(N^2))\n"
-              << "  [2] Барнс-Хат CPU\n"
-              << "  [3] Барнс-Хат GPU (CUDA)\n"
-              << "Введите номер: " << std::flush;
+    if (!is_cli) {
+        std::cout << "Выберите алгоритм:\n"
+                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [2] Барнс-Хат CPU\n"
+                  << "  [3] Барнс-Хат GPU (CUDA)\n"
+                  << "Введите номер: " << std::flush;
+        std::cin >> mode;
+    } else {
+        mode = std::stoi(getCmdOption(argc, argv, "--algo", "1"));
+    }
 #else
-    std::cout << "Выберите алгоритм:\n"
-              << "  [1] Брутфорс (O(N^2))\n"
-              << "  [2] Барнс-Хат CPU\n"
-              << "Введите номер: " << std::flush;
+    if (!is_cli) {
+        std::cout << "Выберите алгоритм:\n"
+                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [2] Барнс-Хат CPU\n"
+                  << "Введите номер: " << std::flush;
+        std::cin >> mode;
+    } else {
+        mode = std::stoi(getCmdOption(argc, argv, "--algo", "1"));
+    }
 #endif
-    std::cin >> mode;
 
     switch(mode) {
         case 1:
@@ -133,9 +172,14 @@ int main() {
             break;
     }
 
-    std::cout << "Введите шаг времени dt (например, 0.000273785 для 1/3652.5): ";
+    // --- 3. Шаг времени dt ---
     std::string dtInput;
-    std::cin >> dtInput;
+    if (!is_cli) {
+        std::cout << "Введите шаг времени dt (например, 0.000273785 для 1/3652.5): ";
+        std::cin >> dtInput;
+    } else {
+        dtInput = getCmdOption(argc, argv, "--dt", "0.000273785");
+    }
     
     try {
         fixedDt = std::stod(dtInput);
@@ -144,39 +188,60 @@ int main() {
         fixedDt = 1.0 / 3652.5;
     }
 
-    // -------- выбор сценария (HDF5 / TXT / рандом) --------
-    std::cout << "Источник начальных условий: [0] HDF5, [1] TXT, [2] Random: " << std::flush;
-    std::cin >> mode;
+    // --- 4. Источник начальных условий ---
+    if (!is_cli) {
+        std::cout << "Источник начальных условий: [0] HDF5, [1] TXT, [2] Random: " << std::flush;
+        std::cin >> mode;
+    } else {
+        mode = std::stoi(getCmdOption(argc, argv, "--source", "2"));
+    }
 
-    if (mode == 0){
-        auto files = ListH5Files("data");
-        if (files.empty()){
-            std::cout << "В ./data нет .h5 файлов. Генерируем рандомно.\n";
-        }
-        else{
-            for (size_t i = 0; i < files.size(); ++i){
-                std::cout << "  [" << (i+1) << "] " << files[i] << "\n";
+    if (mode == 0) {
+        if (!is_cli) {
+            auto files = ListH5Files("data");
+            if (files.empty()){
+                std::cout << "В ./data нет .h5 файлов. Генерируем рандомно.\n";
             }
-            std::cout << "Выберите номер файла: " << std::flush;
-            size_t idx = 0;
-            std::cin >> idx;
+            else{
+                for (size_t i = 0; i < files.size(); ++i){
+                    std::cout << "  [" << (i+1) << "] " << files[i] << "\n";
+                }
+                std::cout << "Выберите номер файла: " << std::flush;
+                size_t idx = 0;
+                std::cin >> idx;
+                bool h5HasColors = false;
+                if (LoadObjectsFromFile(files[idx-1], "Particles", objs, &graphics, &h5HasColors)) {
+                    loaded = true;
+                    if (h5HasColors) {
+                        loadedColorsFromTxt = true;
+                    }
+                    std::cout << "Loaded " << objs.size() << " objects\n";
+                }
+            }
+        } else {
+            std::string h5path = getCmdOption(argc, argv, "--h5", "");
             bool h5HasColors = false;
-            if (LoadObjectsFromFile(files[idx-1], "Particles", objs, &graphics, &h5HasColors)) {
+            if (!h5path.empty() && LoadObjectsFromFile(h5path, "Particles", objs, &graphics, &h5HasColors)) {
                 loaded = true;
                 if (h5HasColors) {
                     loadedColorsFromTxt = true;
                 }
                 std::cout << "Loaded " << objs.size() << " objects\n";
+            } else {
+                std::cout << "Failed to load HDF5 from path: " << h5path << "\n";
             }
-
         }
     }
     else if (mode == 1) {
         std::string txtPath;
-        std::cout << "Введите путь к TXT-файлу (пример: data/solar_system.txt): " << std::flush;
-        std::cin >> txtPath;
+        if (!is_cli) {
+            std::cout << "Введите путь к TXT-файлу (пример: data/solar_system.txt): " << std::flush;
+            std::cin >> txtPath;
+        } else {
+            txtPath = getCmdOption(argc, argv, "--txt", "");
+        }
 
-        if (LoadSystemFromTextFile(txtPath, objs, &graphics)) {
+        if (!txtPath.empty() && LoadSystemFromTextFile(txtPath, objs, &graphics)) {
             loaded = true;
             loadedColorsFromTxt = true;
             std::cout << "Loaded " << objs.size() << " objects from text config\n";
@@ -185,12 +250,16 @@ int main() {
         }
     }
 
-if (!loaded) {
+    if (!loaded) {
         GenParams params;
         params.seed = 42;
         
-        std::cout << "Количество тел: ";
-        std::cin >> params.count;
+        if (!is_cli) {
+            std::cout << "Количество тел: ";
+            std::cin >> params.count;
+        } else {
+            params.count = std::stoi(getCmdOption(argc, argv, "--bodies", "100"));
+        }
 
         params.centralMass = 1.0;      // 1 масса Солнца
         params.baseMass    = 3.0e-6;   // Масса Земли в солнечных
@@ -199,14 +268,19 @@ if (!loaded) {
         params.spread      = 2.0f;     // AU
 
         std::vector<std::string> scenNames = scenarioManager->getNames();
-        std::cout << "Выберите тип генерации:\n";
-        for (size_t i = 0; i < scenNames.size(); ++i) {
-            std::cout << "  [" << (i + 1) << "] " << scenNames[i] << "\n";
-        }
-        
         size_t choice = 0;
-        std::cout << "Ваш выбор: ";
-        std::cin >> choice;
+        
+        if (!is_cli) {
+            std::cout << "Выберите тип генерации:\n";
+            for (size_t i = 0; i < scenNames.size(); ++i) {
+                std::cout << "  [" << (i + 1) << "] " << scenNames[i] << "\n";
+            }
+            std::cout << "Ваш выбор: ";
+            std::cin >> choice;
+        } else {
+            // В питоне ComboBox index начинается с 0, а у нас в консоли с 1. Переводим
+            choice = std::stoi(getCmdOption(argc, argv, "--scenario", "0")) + 1;
+        }
         
         if (choice > 0 && choice <= scenNames.size()) {
             scenarioManager->runScenario(choice - 1, objs, params);
@@ -222,16 +296,26 @@ if (!loaded) {
         physics::colorFromMass(objs, graphics);
     }
 
-    std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
+    // --- 5. Настройки сохранения ---
     std::string filename;
-    std::cin >> filename;
+    if (!is_cli) {
+        std::cout << "Укажите название файла для сохранения (без расширения): " << std::flush;
+        std::cin >> filename;
+    } else {
+        filename = getCmdOption(argc, argv, "--output", "frames");
+    }
 
     int saveIntervalSteps = 10;
-    std::cout << "Как часто сохранять кадры в HDF5? Целое N >= 1: каждый N-й шаг интеграции "
-                 "(1 = каждый шаг, 10 = раз в 10 шагов).\nN = " << std::flush;
-    std::cin >> saveIntervalSteps;
+    if (!is_cli) {
+        std::cout << "Как часто сохранять кадры в HDF5? Целое N >= 1: каждый N-й шаг интеграции "
+                     "(1 = каждый шаг, 10 = раз в 10 шагов).\nN = " << std::flush;
+        std::cin >> saveIntervalSteps;
+    } else {
+        saveIntervalSteps = std::stoi(getCmdOption(argc, argv, "--save_every", "10"));
+    }
+
     if (saveIntervalSteps < 1) {
-        std::cout << "N < 1, используем N = 1.\n";
+        if (!is_cli) std::cout << "N < 1, используем N = 1.\n";
         saveIntervalSteps = 1;
     }
 
@@ -241,10 +325,8 @@ if (!loaded) {
     std::size_t frameIndex = 0;
     WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
     ++frameIndex;
-    // Чтение с HDF5
-
+    
     BodySystem bodySystem(objs); // создание сохрянем информацию о системе
-
     bodySystem.transPointToSystem(objs); // переходим в систему объектов
 
     const double initialEnergy = physics::calculateTotalEnergy(objs);
@@ -253,17 +335,19 @@ if (!loaded) {
     Camera cam;
     SimState state; 
 
-    // Управление
-    Control control(renderer.getWindow(), objs,
-                    cam, state);
+    Control control(renderer.getWindow(), objs, cam, state);
     control.attach();
     int counter = 0;
     double lastTime = glfwGetTime();
     double accumulator = 0.0;
 
     bool isRealTime;
-    std::cout << "Режим реального времени? [1 - Да / 0 Нет]: " << std::flush;
-    std::cin >> isRealTime;
+    if (!is_cli) {
+        std::cout << "Режим реального времени? [1 - Да / 0 Нет]: " << std::flush;
+        std::cin >> isRealTime;
+    } else {
+        isRealTime = (getCmdOption(argc, argv, "--realtime", "1") == "1");
+    }
 
     int stepCounter = 0;
     int frameCounter = 0;
@@ -302,38 +386,27 @@ if (!loaded) {
                 accumulator = 0.0;
             }
 
-            //glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-            //renderer.updateView(cam);
-            //renderer.drawObjects(objs);
-
             control.updateCameraFromKeys();
 
             renderer.renderFrame(objs, graphics, cam);
             ++frameCounter;
-            if (frameCounter % 100 == 0) {
-                // simulationStep(objs, 0.0, true, true);
-                //energyCache = physics::calculateTotalEnergy(objs); // O(N^2) - делаем реже
-            }
 
             double dtForFps = frameRealDt / std::max(1.0f, state.timeScale);
             double fps = (dtForFps > 0.0) ? 1.0 / dtForFps : 0.0;
-            /* const double currentEnergy = energyCache;
-            const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
-            const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
-            */
+            
             std::snprintf(title, sizeof(title),
                   "REAL-TIME | Sim: %.1fx | Cam: %.2fx | FPS: %.0f | Obj: %zu | Time: %.2f%s",
                   state.timeScale, control.getCameraMoveScale(), fps, objs.size(), gSimTime,
                   shiftFreeze ? " | [SHIFT freeze]" : "");
             glfwSetWindowTitle(renderer.getWindow(), title);
 
-            //glfwSwapBuffers(renderer.getWindow());
             glfwPollEvents();
         }
 
     } else {
         int startTime = static_cast<int>(time(NULL));
-        double targetTime;
+        double targetTime = 0.0;
+        
         {
             const double yearsBetweenSaves = fixedDt * static_cast<double>(saveIntervalSteps);
             const double mbPerSimYear =
@@ -341,30 +414,28 @@ if (!loaded) {
                     ? (static_cast<double>(objs.size()) * 3.0 * static_cast<double>(sizeof(float))
                        / (yearsBetweenSaves * 1024.0 * 1024.0))
                     : 0.0;
-            constexpr double kSecPerYear = 365.25 * 86400.0;
-            std::cout << std::fixed << std::setprecision(6);
-            std::cout << "Просчёт (не в реальном времени). Один шаг dt = " << fixedDt << " года.\n";
-            std::cout << "Между сохранёнными кадрами: " << yearsBetweenSaves << " года ("
-                      << saveIntervalSteps << " шаг(ов)). Ориентир размера треков: ~" << std::setprecision(3)
-                      << mbPerSimYear << " МБ на 1 год симуляции, ~" << std::setprecision(6)
-                      << " (оценка по float-позициям; deflate в HDF5 обычно меньше).\n";
-            std::cout << std::setprecision(15);
-            std::cout << "На какое симуляционное время просчитываем? (годы): " << std::flush;
-        }
-        std::cin >> targetTime;
-        {
-            const double yearsBetweenSaves = fixedDt * static_cast<double>(saveIntervalSteps);
-            const double mbPerSimYear =
-                (yearsBetweenSaves > 0.0 && !objs.empty())
-                    ? (static_cast<double>(objs.size()) * 3.0 * static_cast<double>(sizeof(float))
-                       / (yearsBetweenSaves * 1024.0 * 1024.0))
-                    : 0.0;
-            if (targetTime > 0.0 && mbPerSimYear > 0.0) {
+                    
+            if (!is_cli) {
+                std::cout << std::fixed << std::setprecision(6);
+                std::cout << "Просчёт (не в реальном времени). Один шаг dt = " << fixedDt << " года.\n";
+                std::cout << "Между сохранёнными кадрами: " << yearsBetweenSaves << " года ("
+                          << saveIntervalSteps << " шаг(ов)). Ориентир размера треков: ~" << std::setprecision(3)
+                          << mbPerSimYear << " МБ на 1 год симуляции, ~" << std::setprecision(6)
+                          << " (оценка по float-позициям; deflate в HDF5 обычно меньше).\n";
+                std::cout << std::setprecision(15);
+                std::cout << "На какое симуляционное время просчитываем? (годы): " << std::flush;
+                std::cin >> targetTime;
+            } else {
+                targetTime = std::stod(getCmdOption(argc, argv, "--target", "10.0"));
+            }
+            
+            if (targetTime > 0.0 && mbPerSimYear > 0.0 && !is_cli) {
                 std::cout << std::fixed << std::setprecision(2)
                           << "Ориентир объёма треков на весь прогон: ~" << (mbPerSimYear * targetTime)
                           << " МБ (грубо, без учёта initial_data и сжатия).\n";
             }
         }
+        
         double bakeStartRealTime = glfwGetTime();
 
         glfwSwapInterval(0);
@@ -374,10 +445,10 @@ if (!loaded) {
             simulationStep(objs, fixedDt, false, false);
             gSimTime += fixedDt;
             stepCounter += 1;
+            
             if (stepCounter % (1 * 10) == 0) {
                 glfwPollEvents();
 
-                // renderer.renderFrame(objs, graphics, cam);
                 double progress = (gSimTime / targetTime) * 100.0;
                 double elapsed = glfwGetTime() - bakeStartRealTime;
                 double progress_dec = gSimTime / targetTime;
@@ -389,18 +460,12 @@ if (!loaded) {
                 int etaTotalSec = static_cast<int>(etaSeconds);
                 int etaMin = etaTotalSec / 60;
                 int etaSec = etaTotalSec % 60;
-                /* if (stepCounter % 100 == 0) {
-                    simulationStep(objs, 0.0, true, true);
-                    energyCache = physics::calculateTotalEnergy(objs); // O(N^2) - реже
-                }
-                const double currentEnergy = energyCache;
-                const double energyDenom = std::max(std::abs(initialEnergy), 1e-30);
-                const double errorPct = std::abs((currentEnergy - initialEnergy) / energyDenom) * 100.0;
-                */
+                
                 std::snprintf(title, sizeof(title),
                       "BAKING... %.1f%% | ETA: %02d:%02d | Time: %.2f / %.2f | Saved: %zu",
                       progress, etaMin, etaSec, gSimTime, targetTime, frameIndex);
                 glfwSetWindowTitle(renderer.getWindow(), title);
+                std::cout << "PROGRESS:" << progress << std::endl;
             }
             if (stepCounter % saveIntervalSteps == 0) {
                 WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
@@ -423,4 +488,5 @@ if (!loaded) {
     }
 
     CloseSimulationFile(framesFile, frameIndex);
+    return 0;
 }
