@@ -116,8 +116,7 @@ void computeAccelerations(const std::vector<glm::dvec3>& positions,
 
 } // namespace
 
-void simulationStepBrutForceCPU(std::vector<Object>& objs, double dt, bool pause, bool forceSync) {
-    (void)forceSync;
+void simulationStepBrutForceCPU(std::vector<Object>& objs, double dt, bool pause) {
     if (pause || objs.empty()) {
         return;
     }

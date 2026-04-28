@@ -96,7 +96,7 @@ int main(int argc, char* argv[]) {
 
     // Дальняя плоскость в AU (логарифмический Z в шейдерах): ~10^10 AU — очень большая дальность видения.
     renderer.setProjection(65.0f, 1.0f, 1.0e10f);
-    using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause, bool forceSync);
+    using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause);
     Handler simulationStep = nullptr;
 
     RenderMode renderMode = RenderMode::Sphere;
@@ -374,10 +374,13 @@ int main(int argc, char* argv[]) {
 
             constexpr int MAX_SUBSTEPS = 100000;
             while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS && !g_Interrupt) {
-                simulationStep(objs, fixedDt, state.pause, false);
+                simulationStep(objs, fixedDt, state.pause);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
+            }
+            // Trail update раз в кадр — не в каждый substep
+            if (substeps > 0) {
                 for (std::size_t i = 0; i < objs.size(); ++i) {
                     graphics[i].updateTrail(objs[i].position);
                 }
@@ -442,7 +445,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Начинаем расчет..." << std::endl;
 
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime && !g_Interrupt) {
-            simulationStep(objs, fixedDt, false, false);
+            simulationStep(objs, fixedDt, false);
             gSimTime += fixedDt;
             stepCounter += 1;
             
@@ -479,7 +482,7 @@ int main(int argc, char* argv[]) {
         std::cout << "Получен SIGINT (Ctrl+C). Завершаем симуляцию и сохраняем текущее состояние...\n";
     }
 
-    simulationStep(objs, 0.0, true, true);
+    simulationStep(objs, 0.0, true);
     const std::string finalTextPath = "data/" + filename + "_final.txt";
     if (SaveSystemToTextFile(finalTextPath, objs)) {
         std::cout << "Финальное состояние сохранено в " << finalTextPath << "\n";

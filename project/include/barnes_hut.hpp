@@ -4,4 +4,4 @@
 #include <vector>
 #include "object.hpp"
 
-void simulationStepBarnesHutCPU(std::vector<Object>& objs, double dt, bool pause, bool forceSync = false);
+void simulationStepBarnesHutCPU(std::vector<Object>& objs, double dt, bool pause);

@@ -213,8 +213,7 @@ static void accumulateAccel(const Object& obj, const OctreeNode* node,
     }
 }
 
-void simulationStepBarnesHutCPU(std::vector<Object>& objs, double dt, bool pause, bool forceSync) {
-    (void)forceSync;
+void simulationStepBarnesHutCPU(std::vector<Object>& objs, double dt, bool pause) {
     if (pause || objs.empty()) return;
     if (dt <= 0.0) return;
 

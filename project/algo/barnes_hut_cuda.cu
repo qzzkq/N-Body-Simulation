@@ -717,11 +717,12 @@ void CleanupBarnesHutCUDA() {
     accInitialized = false;
 }
 
-void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool pause, bool forceSync) {
+void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool pause) {
     if (objs.empty()) {
         return;
     }
-    if (pause && !forceSync) {
+    // dt==0 && pause — финальный вызов для синхронизации состояния GPU→CPU
+    if (pause && dt > 0.0) {
         return;
     }
 
@@ -781,7 +782,8 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool paus
         objs[i].position = glm::dvec3(h_posMass[i].x, h_posMass[i].y, h_posMass[i].z);
     }
 
-    if (forceSync) {
+    // Финальный вызов (dt==0): синхронизируем vel+acc с GPU
+    if (dt <= 0.0) {
         CHECK_CUDA(cudaMemcpy(h_vel.data(), d_vel, N * sizeof(double3), cudaMemcpyDeviceToHost));
         CHECK_CUDA(cudaMemcpy(h_acc.data(), d_acc, N * sizeof(double3), cudaMemcpyDeviceToHost));
         for (size_t i = 0; i < N; ++i) {

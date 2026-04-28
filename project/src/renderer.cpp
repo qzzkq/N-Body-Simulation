@@ -9,11 +9,8 @@
 static const char* VERTEX_SHADER_SOURCE = R"glsl(
 #version 330 core
 layout(location=0) in vec3 aPos;
-layout(location=2) in vec4 iModel0;
-layout(location=3) in vec4 iModel1;
-layout(location=4) in vec4 iModel2;
-layout(location=5) in vec4 iModel3;
-layout(location=6) in vec4 iColor;
+layout(location=2) in vec4 iPosScale;
+layout(location=3) in vec4 iColor;
 uniform mat4 model;
 uniform mat4 view;
 uniform mat4 projection;
@@ -22,9 +19,17 @@ uniform int useInstancing;
 uniform float farPlane;
 out vec4 vColor;
 void main() {
-    mat4 instanceMatrix = mat4(iModel0, iModel1, iModel2, iModel3);
-    mat4 M = (useInstancing == 1) ? instanceMatrix : model;
-    vColor = (useInstancing == 1) ? iColor : objectColor;
+    mat4 M = mat4(1.0);
+    if (useInstancing == 1) {
+        M[0][0] = iPosScale.w;
+        M[1][1] = iPosScale.w;
+        M[2][2] = iPosScale.w;
+        M[3] = vec4(iPosScale.xyz, 1.0);
+        vColor = iColor;
+    } else {
+        M = model;
+        vColor = objectColor;
+    }
     gl_Position = projection * view * M * vec4(aPos, 1.0);
     float C = 1.0;
     gl_Position.z = (2.0 * log(C * gl_Position.w + 1.0) / log(C * farPlane + 1.0) - 1.0) * gl_Position.w;
@@ -43,9 +48,12 @@ void main() {
 static const char* TRAIL_VS = R"glsl(
 #version 330 core
 layout(location=0) in vec3 aPos;
+layout(location=1) in vec4 aColor;
 uniform mat4 view;
 uniform mat4 projection;
+out vec4 vColor;
 void main() {
+    vColor = aColor;
     gl_Position = projection * view * vec4(aPos, 1.0);
 }
 )glsl";
@@ -53,9 +61,9 @@ void main() {
 static const char* TRAIL_FS = R"glsl(
 #version 330 core
 out vec4 FragColor;
-uniform vec4 color;
+in vec4 vColor;
 void main() {
-    FragColor = color;
+    FragColor = vColor;
 }
 )glsl";
 
@@ -76,7 +84,7 @@ void main() {
     const float refDist = 2000.0;
     const float pxRef = 4.5;
     float sizePx = pxRef * refDist / max(dist, refDist * 0.02);
-    gl_PointSize = clamp(sizePx, 0.5, 48.0);
+    gl_PointSize = clamp(sizePx, 1.5, 48.0);
 }
 )glsl";
 
@@ -112,6 +120,9 @@ Renderer::~Renderer() {
         glDeleteBuffers(1, &pointColorVBO_);
         glDeleteBuffers(1, &instanceModelVBO_);
         glDeleteBuffers(1, &instanceColorVBO_);
+        glDeleteVertexArrays(1, &trailVAO_);
+        glDeleteBuffers(1, &trailVBO_);
+        glDeleteBuffers(1, &trailColorVBO_);
         glDeleteProgram(program_);
         glDeleteProgram(pointProgram_);
     }
@@ -165,69 +176,80 @@ void Renderer::updateView(const Camera& camera)
     glUniformMatrix4fv(glGetUniformLocation(trailProgram_, "view"), 1, GL_FALSE, glm::value_ptr(viewMatrix_));
 }
 
+// Растит GPU-буфер только если нужно больше места; иначе только SubData.
+static void uploadBuffer(GLuint buf, const void* data, GLsizeiptr byteSize,
+                         GLsizeiptr& capacity, GLenum usage)
+{
+    glBindBuffer(GL_ARRAY_BUFFER, buf);
+    if (byteSize > capacity) {
+        // Выделяем с запасом ×1.5 чтобы реже переаллоцировать
+        capacity = byteSize + byteSize / 2;
+        glBufferData(GL_ARRAY_BUFFER, capacity, nullptr, usage);
+    }
+    glBufferSubData(GL_ARRAY_BUFFER, 0, byteSize, data);
+}
+
 void Renderer::drawObjects(const std::vector<Object>& objs, const std::vector<GraphicState>& graphics, const Camera& cam) {
     glUseProgram(program_);
 
     if (graphics.size() != objs.size()) return;
 
-    static std::vector<glm::mat4> modelMatrices;
+    static std::vector<glm::vec4> modelPosScales;
     static std::vector<glm::vec4> colors;
     static std::vector<glm::vec3> pointPositions;
     static std::vector<glm::vec4> pointColors;
 
-    modelMatrices.clear(); colors.clear();
+    modelPosScales.clear(); colors.clear();
     pointPositions.clear(); pointColors.clear();
 
-    const float lodSphereMaxDist = 15000.0f; 
+    const float lodSphereMaxDist = 15000.0f;
 
     for (std::size_t i = 0; i < objs.size(); ++i) {
         glm::dvec3 relativePos = objs[i].position - glm::dvec3(cam.pos);
         float distance = static_cast<float>(glm::length(relativePos));
 
-        // Если режим Точки ИЛИ объект далеко — рисуем точкой
         if (mode_ == RenderMode::Points || distance >= lodSphereMaxDist) {
             pointPositions.push_back(glm::vec3(relativePos));
             pointColors.push_back(graphics[i].color);
         } else {
-            // Иначе (Сферы или Кубы вблизи)
             const float farFalloff = 1.0f / (1.0f + distance / 30000.0f);
             float visualScale = std::max(static_cast<float>(objs[i].radius), distance * 0.002f * farFalloff);
-
-            glm::mat4 M(1.0f);
-            M = glm::translate(M, glm::vec3(relativePos));
-            M = glm::scale(M, glm::vec3(visualScale));
-
-            modelMatrices.push_back(M);
+            modelPosScales.push_back(glm::vec4(relativePos.x, relativePos.y, relativePos.z, visualScale));
             colors.push_back(graphics[i].color);
         }
     }
 
     // Отрисовка 3D-геометрии (Кубы или Сферы)
-    if (!modelMatrices.empty()) {
-        glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
-        glBufferData(GL_ARRAY_BUFFER, modelMatrices.size() * sizeof(glm::mat4), modelMatrices.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
-        glBufferData(GL_ARRAY_BUFFER, colors.size() * sizeof(glm::vec4), colors.data(), GL_DYNAMIC_DRAW);
+    if (!modelPosScales.empty()) {
+        uploadBuffer(instanceModelVBO_, modelPosScales.data(),
+                     static_cast<GLsizeiptr>(modelPosScales.size() * sizeof(glm::vec4)),
+                     instanceModelCap_, GL_STREAM_DRAW);
+        uploadBuffer(instanceColorVBO_, colors.data(),
+                     static_cast<GLsizeiptr>(colors.size() * sizeof(glm::vec4)),
+                     instanceColorCap_, GL_STREAM_DRAW);
 
         glUniform1i(uUseInstancing_, 1);
-        
+
         if (mode_ == RenderMode::Cubes) {
             glBindVertexArray(cubeVAO_);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, 36, static_cast<GLsizei>(modelMatrices.size()));
+            glDrawArraysInstanced(GL_TRIANGLES, 0, 36, static_cast<GLsizei>(modelPosScales.size()));
         } else {
             glBindVertexArray(sphereVAO_);
-            glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(sphereVertexCount_), static_cast<GLsizei>(modelMatrices.size()));
+            glDrawArraysInstanced(GL_TRIANGLES, 0, static_cast<GLsizei>(sphereVertexCount_), static_cast<GLsizei>(modelPosScales.size()));
         }
         glBindVertexArray(0);
     }
 
-    //Отрисовка точек
+    // Отрисовка точек
     if (!pointPositions.empty()) {
         glUseProgram(pointProgram_);
-        glBindBuffer(GL_ARRAY_BUFFER, pointVBO_);
-        glBufferData(GL_ARRAY_BUFFER, pointPositions.size() * sizeof(glm::vec3), pointPositions.data(), GL_DYNAMIC_DRAW);
-        glBindBuffer(GL_ARRAY_BUFFER, pointColorVBO_);
-        glBufferData(GL_ARRAY_BUFFER, pointColors.size() * sizeof(glm::vec4), pointColors.data(), GL_DYNAMIC_DRAW);
+
+        uploadBuffer(pointVBO_, pointPositions.data(),
+                     static_cast<GLsizeiptr>(pointPositions.size() * sizeof(glm::vec3)),
+                     pointPosCap_, GL_STREAM_DRAW);
+        uploadBuffer(pointColorVBO_, pointColors.data(),
+                     static_cast<GLsizeiptr>(pointColors.size() * sizeof(glm::vec4)),
+                     pointColorCap_, GL_STREAM_DRAW);
 
         glBindVertexArray(pointVAO_);
         glDrawArrays(GL_POINTS, 0, static_cast<GLsizei>(pointPositions.size()));
@@ -261,33 +283,57 @@ void Renderer::drawTrails(const std::vector<Object>& objs, const std::vector<Gra
 
     glUseProgram(trailProgram_);
 
-    glBindVertexArray(trailVAO_);
-    glBindBuffer(GL_ARRAY_BUFFER, trailVBO_);
+    static std::vector<glm::vec3> allTrailPositions;
+    static std::vector<glm::vec4> allTrailColors;
+    static std::vector<GLint>     firsts;
+    static std::vector<GLsizei>   counts;
 
-    // std::deque не гарантирует непрерывное расположение в памяти, поэтому
-    // перед отправкой в GPU копируем в небольшой временный буфер.
-    static thread_local std::vector<glm::vec3> trailScratch;
+    allTrailPositions.clear();
+    allTrailColors.clear();
+    firsts.clear();
+    counts.clear();
+
+    GLint currentFirst = 0;
+
     for (std::size_t i = 0; i < objs.size(); ++i) {
         const auto& gfx = graphics[i];
-        if (gfx.trail.size() < 2) continue;
+        if (gfx.trailSize < 2) continue;
 
-        trailScratch.resize(gfx.trail.size());
-        for (std::size_t j = 0; j < gfx.trail.size(); ++j) {
-            glm::dvec3 relativeTrailPos = glm::dvec3(gfx.trail[j]) - glm::dvec3(cam.pos);
-            trailScratch[j] = glm::vec3(relativeTrailPos);
+        const glm::vec3 baseColor = glm::vec3(gfx.color) * 0.7f;
+        const float invSize = 1.0f / static_cast<float>(gfx.trailSize - 1);
+
+        for (int j = 0; j < gfx.trailSize; ++j) {
+            glm::dvec3 relPos = glm::dvec3(gfx.trailAt(j)) - glm::dvec3(cam.pos);
+            allTrailPositions.push_back(glm::vec3(relPos));
+            // Fade: хвост прозрачный, голова яркая
+            float alpha = static_cast<float>(j) * invSize * 0.6f;
+            allTrailColors.push_back(glm::vec4(baseColor, alpha));
         }
-        glBufferData(GL_ARRAY_BUFFER, gfx.trail.size() * sizeof(glm::vec3), trailScratch.data(), GL_DYNAMIC_DRAW);
-        
+
+        firsts.push_back(currentFirst);
+        counts.push_back(static_cast<GLsizei>(gfx.trailSize));
+        currentFirst += static_cast<GLint>(gfx.trailSize);
+    }
+
+    if (!allTrailPositions.empty()) {
+        glBindVertexArray(trailVAO_);
+
+        uploadBuffer(trailVBO_, allTrailPositions.data(),
+                     static_cast<GLsizeiptr>(allTrailPositions.size() * sizeof(glm::vec3)),
+                     trailPosCap_, GL_STREAM_DRAW);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
         glEnableVertexAttribArray(0);
 
-        glm::vec4 trailColor = gfx.color * 0.7f;
-        trailColor.a = 0.5f; 
-        glUniform4fv(glGetUniformLocation(trailProgram_, "color"), 1, glm::value_ptr(trailColor));
+        uploadBuffer(trailColorVBO_, allTrailColors.data(),
+                     static_cast<GLsizeiptr>(allTrailColors.size() * sizeof(glm::vec4)),
+                     trailColorCap_, GL_STREAM_DRAW);
+        glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
+        glEnableVertexAttribArray(1);
 
-        glDrawArrays(GL_LINE_STRIP, 0, static_cast<GLsizei>(gfx.trail.size()));
+        glMultiDrawArrays(GL_LINE_STRIP, firsts.data(), counts.data(), static_cast<GLsizei>(firsts.size()));
+
+        glBindVertexArray(0);
     }
-    glBindVertexArray(0);
 }
 
 //==PRIVATE BLOCK==
@@ -422,6 +468,22 @@ void Renderer::initSphereGeometry() {
 void Renderer::initTrailVAO_VBO() {
     glGenVertexArrays(1, &trailVAO_);
     glGenBuffers(1, &trailVBO_);
+    glGenBuffers(1, &trailColorVBO_);
+
+    // Настраиваем VAO один раз — drawTrails только обновляет данные
+    glBindVertexArray(trailVAO_);
+
+    glBindBuffer(GL_ARRAY_BUFFER, trailVBO_);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STREAM_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, sizeof(glm::vec3), (void*)0);
+    glEnableVertexAttribArray(0);
+
+    glBindBuffer(GL_ARRAY_BUFFER, trailColorVBO_);
+    glBufferData(GL_ARRAY_BUFFER, 0, nullptr, GL_STREAM_DRAW);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
+    glEnableVertexAttribArray(1);
+
+    glBindVertexArray(0);
 }
 
 bool Renderer::initWindow(int width, int height, const char* title, bool fullscreen, bool maximized) {
@@ -510,24 +572,14 @@ void Renderer::setupInstanceAttribs(GLuint vao) {
     glBindVertexArray(vao);
 
     glBindBuffer(GL_ARRAY_BUFFER, instanceModelVBO_);
-    constexpr GLsizei matStride = static_cast<GLsizei>(sizeof(glm::mat4));
     glEnableVertexAttribArray(2);
-    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, matStride, (void*)0);
-    glEnableVertexAttribArray(3);
-    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(sizeof(glm::vec4)));
-    glEnableVertexAttribArray(4);
-    glVertexAttribPointer(4, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(2 * sizeof(glm::vec4)));
-    glEnableVertexAttribArray(5);
-    glVertexAttribPointer(5, 4, GL_FLOAT, GL_FALSE, matStride, (void*)(3 * sizeof(glm::vec4)));
+    glVertexAttribPointer(2, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
     glVertexAttribDivisor(2, 1);
-    glVertexAttribDivisor(3, 1);
-    glVertexAttribDivisor(4, 1);
-    glVertexAttribDivisor(5, 1);
 
     glBindBuffer(GL_ARRAY_BUFFER, instanceColorVBO_);
-    glEnableVertexAttribArray(6);
-    glVertexAttribPointer(6, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
-    glVertexAttribDivisor(6, 1);
+    glEnableVertexAttribArray(3);
+    glVertexAttribPointer(3, 4, GL_FLOAT, GL_FALSE, sizeof(glm::vec4), (void*)0);
+    glVertexAttribDivisor(3, 1);
 
     glBindVertexArray(0);
 }

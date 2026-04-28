@@ -77,11 +77,20 @@ private:
 
     //VAO и VBO для трэйлов
     GLuint trailVAO_ = 0;
-    GLuint trailVBO_ = 0; 
+    GLuint trailVBO_ = 0;
+    GLuint trailColorVBO_ = 0;
 
-    glm::mat4 viewMatrix_; 
-    glm::mat4 projectionMatrix_; 
+    // Выделенные размеры GPU-буферов — у каждого VBO своя ёмкость
+    GLsizeiptr instanceModelCap_ = 0;
+    GLsizeiptr instanceColorCap_ = 0;
+    GLsizeiptr pointPosCap_      = 0;
+    GLsizeiptr pointColorCap_    = 0;
+    GLsizeiptr trailPosCap_      = 0;
+    GLsizeiptr trailColorCap_    = 0;
+
+    glm::mat4 viewMatrix_;
+    glm::mat4 projectionMatrix_;
     float farPlane_ = 1.0e10f;
-    
-    bool successInit_ = false; 
+
+    bool successInit_ = false;
 };
