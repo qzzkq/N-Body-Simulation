@@ -1,0 +1,106 @@
+76 [30192] INFO perfrun.launcher <> - Launcher main begin
+83 [30192] INFO perfrun.launcher <> - MessageCatalogInit finished
+83 [30192] INFO perfrun.launcher <> - Launcher instance created
+83 [30192] INFO perfrun.launcher <> - argc = 7; cmdline = E:\soft\Intel\oneAPI\vtune\latest\bin64\amplxe-runss.exe --ui-output-format xml --ui-output-fd 976 --option-file C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\config\runss.options 
+114 [30192] INFO perfrun.launcher <> - New signal handler callback was added
+166 [30192] INFO perfrun.perfcollector <> - SEP tool path: E:\soft\Intel\oneAPI\vtune\latest\bin64\sep.exe
+180 [30192] INFO perfrun.launcher <> - create msngr2::ICliToolContext
+180 [30192] INFO perfrun.launcher <> - create file finder object
+180 [30192] INFO perfrun.launcher <> - create a result directory: pattern = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs pid = 4294967295
+186 [30192] INFO perfrun.launcher <> - create data directory = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0
+186 [30192] INFO perfrun.launcher <> - Creating the master collection flag
+192 [30192] INFO perfrun.launcher <> - Done creating the master collection flag
+192 [25480] INFO perfrun.launcher <> - plugin [remoteplug] was disabled because it doesn't support the given collection type.
+192 [25480] INFO perfrun.sdk <> - Allocating TMU :C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0\systemcollector-26720-DESKTOP-G1MRM99.sc
+193 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.launcher <> - plugin [gpu] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.launcher <> - plugin [etw.kernel] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.launcher <> - plugin [etw.dx] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.launcher <> - plugin [etw.wsa] was disabled because it doesn't support the given collection type.
+195 [25480] INFO perfrun.mrte <> - system-wide mode is 0
+196 [25480] INFO perfrun.mrte <> - Getting  mrte profiling environment ...
+257 [25480] INFO perfrun.mrte <> - INTEL_MRTE_DATA_DIR=C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0
+257 [25480] INFO perfrun.mrte <> - INTEL_MRTE_HOST_NAME=DESKTOP-G1MRM99
+258 [25480] INFO perfrun.mrte <> - JAVA_TOOL_OPTIONS=-agentlib:amplxe_samplingmrte_javaprof_1.0
+258 [25480] INFO perfrun.mrte <> - PATH=E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+258 [25480] INFO perfrun.mrte <> - COR_ENABLE_PROFILING=1
+258 [25480] INFO perfrun.mrte <> - COR_PROFILER={AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+258 [25480] INFO perfrun.mrte <> - COMPLUS_ProfAPI_ProfilerCompatibilitySetting=EnableV2Profiler
+258 [25480] INFO perfrun.mrte <> - CORECLR_ENABLE_PROFILING=1
+258 [25480] INFO perfrun.mrte <> - CORECLR_PROFILER={AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+258 [25480] INFO perfrun.mrte <> - CORECLR_PROFILER_PATH=E:\soft\Intel\oneAPI\vtune\latest\bin64/amplxe_samplingmrte_clrprof_1.0.dll
+258 [25480] INFO perfrun.mrte <> - INTEL_MRTE_PROFILER_MODE=mixed
+258 [25480] INFO perfrun.mrte <> - Data directory: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0
+258 [25480] INFO perfrun.mrte <> - Mrte plugin is initialized
+258 [25480] INFO perfrun.launcher <> - plugin [emon] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [cuscol] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [stdsrc] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [sep] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [vtsspp] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [perf] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [aoclprofile] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.tpss <> - initialize tpss controller
+258 [25480] INFO perfrun.tpss <> - configure collection mode: value = cpu:stack
+258 [25480] INFO perfrun.tpss <> - default obj-size-min=1024
+258 [25480] INFO perfrun.tpss <> - default hash-table-size=0
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [power] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [l0_metrics] was disabled because it doesn't support the given collection type.
+258 [25480] INFO perfrun.launcher <> - plugin [stall_reasons] was disabled because it doesn't support the given collection type.
+259 [30192] INFO perfrun.launcher <> - set environment variable: PATH = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+259 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_LIBITTNOTIFY32 = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime\ittnotify_collector.dll
+259 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_LIBITTNOTIFY64 = E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime\ittnotify_collector.dll
+259 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_ITTNOTIFY_GROUPS = 
+259 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_JIT_PROFILER32 = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime\ittnotify_collector.dll
+260 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_JIT_PROFILER64 = E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime\ittnotify_collector.dll
+260 [30192] INFO perfrun.launcher <> - set environment variable: CCL_ITT_LEVEL = 1
+260 [30192] INFO perfrun.launcher <> - set environment variable: ENABLE_JITPROFILING = 1
+260 [30192] INFO perfrun.launcher <> - set environment variable: CL_CONFIG_USE_VTUNE = True
+260 [30192] INFO perfrun.launcher <> - set environment variable: KMP_FORKJOIN_FRAMES = 0
+260 [30192] INFO perfrun.launcher <> - set environment variable: KMP_FORKJOIN_FRAMES_MODE = 0
+260 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_DATA_DIR = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0
+260 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_HOST_NAME = DESKTOP-G1MRM99
+260 [30192] INFO perfrun.launcher <> - set environment variable: JAVA_TOOL_OPTIONS = -agentlib:amplxe_samplingmrte_javaprof_1.0
+260 [30192] INFO perfrun.launcher <> - set environment variable: PATH = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+260 [30192] INFO perfrun.launcher <> - set environment variable: COR_ENABLE_PROFILING = 1
+260 [30192] INFO perfrun.launcher <> - set environment variable: COR_PROFILER = {AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+260 [30192] INFO perfrun.launcher <> - set environment variable: COMPLUS_ProfAPI_ProfilerCompatibilitySetting = EnableV2Profiler
+261 [30192] INFO perfrun.launcher <> - set environment variable: CORECLR_ENABLE_PROFILING = 1
+261 [30192] INFO perfrun.launcher <> - set environment variable: CORECLR_PROFILER = {AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+261 [30192] INFO perfrun.launcher <> - set environment variable: CORECLR_PROFILER_PATH = E:\soft\Intel\oneAPI\vtune\latest\bin64/amplxe_samplingmrte_clrprof_1.0.dll
+261 [30192] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_PROFILER_MODE = mixed
+261 [30192] INFO perfrun.launcher <> - RpcServer: run RPC server to handle requests
+266 [30192] INFO perfrun.sdk <> - IProcessUtil: the given executable 'C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe' is valid.
+266 [30192] INFO perfrun.launcher <> - Launcher: command line to start before modification = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe
+270 [30192] INFO perfrun.launcher <> - Launcher: command line to start after modification = E:\soft\Intel\oneAPI\vtune\2025.8\bin64\pin.exe -error_file C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0\pinerr.tpsslog -detach_reattach -probe -follow_execv -p32 E:\soft\Intel\oneAPI\vtune\latest\bin32\pin.exe -p64 E:\soft\Intel\oneAPI\vtune\latest\bin64\pin.exe -t64 E:\soft\Intel\oneAPI\vtune\latest\bin64\tpsstool.dll -t E:\soft\Intel\oneAPI\vtune\latest\bin32\tpsstool.dll -server_name tpss_ipc.26720 -prd_dir E:\soft\Intel\oneAPI\vtune\2025.8 -- C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe
+270 [30192] INFO perfrun.launcher <> - ProcessCreator object was created
+275 [30192] INFO perfrun.launcher <> - Launcher: the process was started in suspend mode
+275 [25480] INFO perfrun.itt <> - start itt controller for pid #17388
+276 [25480] INFO perfrun.tpss <> - start tpss controller for pid #17388
+327 [30192] INFO perfrun.launcher <> - Launcher: all plugins were started
+327 [30192] INFO perfrun.launcher <> - DirectoryMonitor object was created
+327 [30192] INFO perfrun.launcher <> - DirectoryMonitor: a callback was added
+327 [30192] INFO perfrun.launcher <> - DirectoryMonitor was started with pingTime = 1000
+328 [30192] INFO perfrun.launcher <> - DeadlineTimer is going to be constructed
+328 [30192] INFO perfrun.launcher <> - DeadlineTimer: a callback was added
+334 [30192] INFO perfrun.launcher <> - Launcher: resume the profiled application and  wait its termination or stop command
+45272 [30192] INFO perfrun.launcher <> - Launcher: the profiled application was terminated  with exit code = 0
+45288 [25480] INFO perfrun.itt <> - detach itt controller
+45288 [25480] INFO perfrun.itt <> - detach itt controller done
+45288 [25480] INFO perfrun.tpss <> - stop tpss controller
+45289 [25480] INFO perfrun.sdk <> - De-allocating TMU: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0\systemcollector-26720-DESKTOP-G1MRM99.sc
+45308 [25480] INFO perfrun.system <> - closed the system trace file: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs\data.0\systemcollector-26720-DESKTOP-G1MRM99.sc
+45308 [30192] INFO perfrun.launcher <> - Launcher: all plugins were stopped.
+45308 [30192] INFO perfrun.launcher <> - DeadlineTimer is going to be destroyed
+45308 [30192] INFO perfrun.launcher <> - DeadlineTimer was destroyed
+45309 [30192] INFO perfrun.launcher <> - DirectoryMonitor object was destroyed
+45309 [30192] WARN perfrun.launcher <> - Stop command is ignored because it is received when collection is already stopped, at file: vcs\perfrun1\launcher\src\command_handler.cpp:226
+45310 [30192] INFO perfrun.launcher <> - Application exit code: 0
+45310 [30192] INFO perfrun.launcher <> - Exit code: 0

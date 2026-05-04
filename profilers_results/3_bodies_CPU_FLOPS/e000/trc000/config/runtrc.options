@@ -1,0 +1,13 @@
+-r
+C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\3_bodies_CPU_FLOPS\e000\trc000
+-quiet
+-cs-file
+C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\3_bodies_CPU_FLOPS\e000\callstacks.def
+--cs-mode=no-count-loops,no-count-flops,stl-profiling,stack-stitching
+--target-loops=n
+--count-flops
+--jit-profiling
+--benchmarks=dram,mcdram,cpu_cache,flop_peak,int,
+--target-gpu=none
+--
+./Simulate.exe

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- <!DOCTYPE IntelParallelAdvisorSummaryCollection SYSTEM  "IntelParallelAdvisorSummaryCollection.dtd"> -->
+
+<IntelParallelAdvisorSummary version="" 
+                             kind="DATAKIND_SURVEY_EX" >
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\src\main.cpp"
+           line_no="272"
+           routine="main"
+           is_vectorized="0"
+           self_time="0.000000E+00"
+           total_time="6.353102E+00"
+           trip_counts=""
+           func_instance="103"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\src\main.cpp"
+           line_no="292"
+           routine="main"
+           is_vectorized="0"
+           self_time="0.000000E+00"
+           total_time="1.001018E+00"
+           trip_counts=""
+           func_instance="102"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="257"
+           routine="&lt;lambda_596d4864974ad3f4848b3c7f21d7d1ad&gt;::operator()"
+           is_vectorized="1"
+           self_time="6.237610E-02"
+           total_time="7.656240E-01"
+           trip_counts=""
+           func_instance="599"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="262"
+           routine="simulationStepBarnesHutCPU"
+           is_vectorized="0"
+           self_time="0.000000E+00"
+           total_time="7.567571E-01"
+           trip_counts=""
+           func_instance="105"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="63"
+           routine="insertBody"
+           is_vectorized="0"
+           self_time="4.137920E-02"
+           total_time="1.428418E-01"
+           trip_counts=""
+           func_instance="131"
+           priority="0"/>
+</IntelParallelAdvisorSummary >

@@ -1,0 +1,15 @@
+-r
+C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r000hs
+--stack-stitching
+--data-limit-mb=1000
+--disk-space-limit=0
+--mrte-type=java,dotnet,python
+--stack-unwind-limit=8388608
+--itt-config=frame
+--itt-config=task,event,counter
+--stackwalk=offline
+--mrte-mode=auto
+--type=cpu:stack
+--interval=10
+--
+C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe

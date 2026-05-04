@@ -1,0 +1,190 @@
+76 [14068] INFO perfrun.launcher <> - Launcher main begin
+83 [14068] INFO perfrun.launcher <> - MessageCatalogInit finished
+83 [14068] INFO perfrun.launcher <> - Launcher instance created
+83 [14068] INFO perfrun.launcher <> - argc = 7; cmdline = E:\soft\Intel\oneAPI\vtune\latest\bin64\amplxe-runss.exe --ui-output-format xml --ui-output-fd 964 --option-file C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\config\runss.options 
+115 [14068] INFO perfrun.launcher <> - New signal handler callback was added
+168 [14068] INFO perfrun.perfcollector <> - SEP tool path: E:\soft\Intel\oneAPI\vtune\latest\bin64\sep.exe
+182 [14068] INFO perfrun.launcher <> - create msngr2::ICliToolContext
+182 [14068] INFO perfrun.launcher <> - create file finder object
+182 [14068] INFO perfrun.launcher <> - create a result directory: pattern = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs pid = 4294967295
+187 [14068] INFO perfrun.launcher <> - create data directory = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0
+188 [14068] INFO perfrun.launcher <> - Creating the master collection flag
+194 [14068] INFO perfrun.launcher <> - Done creating the master collection flag
+194 [16244] INFO perfrun.launcher <> - plugin [remoteplug] was disabled because it doesn't support the given collection type.
+194 [16244] INFO perfrun.sdk <> - Allocating TMU :C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0\systemcollector-3956-DESKTOP-G1MRM99.sc
+195 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.launcher <> - plugin [gpu] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.launcher <> - plugin [etw.kernel] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.launcher <> - plugin [etw.dx] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.launcher <> - plugin [etw.wsa] was disabled because it doesn't support the given collection type.
+197 [16244] INFO perfrun.mrte <> - system-wide mode is 0
+198 [16244] INFO perfrun.mrte <> - Getting  mrte profiling environment ...
+260 [16244] INFO perfrun.mrte <> - INTEL_MRTE_DATA_DIR=C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0
+260 [16244] INFO perfrun.mrte <> - INTEL_MRTE_HOST_NAME=DESKTOP-G1MRM99
+260 [16244] INFO perfrun.mrte <> - JAVA_TOOL_OPTIONS=-agentlib:amplxe_samplingmrte_javaprof_1.0
+260 [16244] INFO perfrun.mrte <> - PATH=E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+261 [16244] INFO perfrun.mrte <> - COR_ENABLE_PROFILING=1
+261 [16244] INFO perfrun.mrte <> - COR_PROFILER={AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+261 [16244] INFO perfrun.mrte <> - COMPLUS_ProfAPI_ProfilerCompatibilitySetting=EnableV2Profiler
+261 [16244] INFO perfrun.mrte <> - CORECLR_ENABLE_PROFILING=1
+261 [16244] INFO perfrun.mrte <> - CORECLR_PROFILER={AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+261 [16244] INFO perfrun.mrte <> - CORECLR_PROFILER_PATH=E:\soft\Intel\oneAPI\vtune\latest\bin64/amplxe_samplingmrte_clrprof_1.0.dll
+261 [16244] INFO perfrun.mrte <> - INTEL_MRTE_PROFILER_MODE=mixed
+261 [16244] INFO perfrun.mrte <> - Data directory: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0
+261 [16244] INFO perfrun.mrte <> - Mrte plugin is initialized
+261 [16244] INFO perfrun.launcher <> - plugin [emon] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [cuscol] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [stdsrc] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [sep] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [vtsspp] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [perf] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [aoclprofile] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.tpss <> - initialize tpss controller
+261 [16244] INFO perfrun.tpss <> - configure collection mode: value = cpu:stack
+261 [16244] INFO perfrun.tpss <> - default obj-size-min=1024
+261 [16244] INFO perfrun.tpss <> - default hash-table-size=0
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [power] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [l0_metrics] was disabled because it doesn't support the given collection type.
+261 [16244] INFO perfrun.launcher <> - plugin [stall_reasons] was disabled because it doesn't support the given collection type.
+262 [14068] INFO perfrun.launcher <> - set environment variable: PATH = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+262 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_LIBITTNOTIFY32 = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime\ittnotify_collector.dll
+262 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_LIBITTNOTIFY64 = E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime\ittnotify_collector.dll
+262 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_ITTNOTIFY_GROUPS = 
+262 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_JIT_PROFILER32 = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime\ittnotify_collector.dll
+263 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_JIT_PROFILER64 = E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime\ittnotify_collector.dll
+263 [14068] INFO perfrun.launcher <> - set environment variable: CCL_ITT_LEVEL = 1
+263 [14068] INFO perfrun.launcher <> - set environment variable: ENABLE_JITPROFILING = 1
+263 [14068] INFO perfrun.launcher <> - set environment variable: CL_CONFIG_USE_VTUNE = True
+263 [14068] INFO perfrun.launcher <> - set environment variable: KMP_FORKJOIN_FRAMES = 0
+263 [14068] INFO perfrun.launcher <> - set environment variable: KMP_FORKJOIN_FRAMES_MODE = 0
+263 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_DATA_DIR = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0
+263 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_HOST_NAME = DESKTOP-G1MRM99
+263 [14068] INFO perfrun.launcher <> - set environment variable: JAVA_TOOL_OPTIONS = -agentlib:amplxe_samplingmrte_javaprof_1.0
+263 [14068] INFO perfrun.launcher <> - set environment variable: PATH = E:\soft\Intel\oneAPI\vtune\latest\bin32\runtime;E:\soft\Intel\oneAPI\vtune\latest\bin64\runtime;C:\Users\yojik\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\local\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\usr\bin;C:\Program Files\Git\mingw64\bin;C:\Program Files\Git\usr\bin;C:\Users\yojik\bin;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin\x64;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v13.2\bin;C:\ProgramData\Oracle\Java\javapath;C:\Program Files (x86)\Common Files\Oracle\Java\javapath;C:\Windows\system32;C:\Windows;C:\Windows\System32\Wbem;C:\Windows\System32\WindowsPowerShell\v1.0;C:\Windows\System32\OpenSSH;C:\Program Files (x86)\NVIDIA Corporation\PhysX\Common;C:\Program Files\NVIDIA Corporation\NVIDIA app\NvDLISR;C:\Program Files\Git\cmd;C:\Program Files\dotnet;C:\Program Files\HDF_Group\HDF5\2.0.0\bin;C:\msys64\mingw64\bin;C:\Program Files\NVIDIA Corporation\Nsight Compute 2026.1.0;C:\Users\yojik\AppData\Local\Programs\Python\Python313\Scripts;C:\Users\yojik\AppData\Local\Programs\Python\Python313;C:\Users\yojik\AppData\Local\Microsoft\WindowsApps;C:\Program Files\JetBrains\PyCharm 2025.2.2\bin;D:\soft\cursor\resources\app\bin;C:\Users\yojik\AppData\Local\spicetify;E:\soft\IntelliJ IDEA 2025.3.4\bin;C:\Program Files\Git\usr\bin\vendor_perl;C:\Program Files\Git\usr\bin\core_perl
+263 [14068] INFO perfrun.launcher <> - set environment variable: COR_ENABLE_PROFILING = 1
+263 [14068] INFO perfrun.launcher <> - set environment variable: COR_PROFILER = {AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+263 [14068] INFO perfrun.launcher <> - set environment variable: COMPLUS_ProfAPI_ProfilerCompatibilitySetting = EnableV2Profiler
+263 [14068] INFO perfrun.launcher <> - set environment variable: CORECLR_ENABLE_PROFILING = 1
+263 [14068] INFO perfrun.launcher <> - set environment variable: CORECLR_PROFILER = {AA5E4821-E3B1-479c-B7FF-5AD047D22CED}
+264 [14068] INFO perfrun.launcher <> - set environment variable: CORECLR_PROFILER_PATH = E:\soft\Intel\oneAPI\vtune\latest\bin64/amplxe_samplingmrte_clrprof_1.0.dll
+264 [14068] INFO perfrun.launcher <> - set environment variable: INTEL_MRTE_PROFILER_MODE = mixed
+264 [14068] INFO perfrun.launcher <> - RpcServer: run RPC server to handle requests
+270 [14068] INFO perfrun.sdk <> - IProcessUtil: the given executable 'C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe' is valid.
+270 [14068] INFO perfrun.launcher <> - Launcher: command line to start before modification = C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe
+273 [14068] INFO perfrun.launcher <> - Launcher: command line to start after modification = E:\soft\Intel\oneAPI\vtune\2025.8\bin64\pin.exe -error_file C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0\pinerr.tpsslog -detach_reattach -probe -follow_execv -p32 E:\soft\Intel\oneAPI\vtune\latest\bin32\pin.exe -p64 E:\soft\Intel\oneAPI\vtune\latest\bin64\pin.exe -t64 E:\soft\Intel\oneAPI\vtune\latest\bin64\tpsstool.dll -t E:\soft\Intel\oneAPI\vtune\latest\bin32\tpsstool.dll -server_name tpss_ipc.3956 -prd_dir E:\soft\Intel\oneAPI\vtune\2025.8 -- C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe
+273 [14068] INFO perfrun.launcher <> - ProcessCreator object was created
+278 [14068] INFO perfrun.launcher <> - Launcher: the process was started in suspend mode
+279 [16244] INFO perfrun.itt <> - start itt controller for pid #14996
+280 [16244] INFO perfrun.tpss <> - start tpss controller for pid #14996
+335 [14068] INFO perfrun.launcher <> - Launcher: all plugins were started
+335 [14068] INFO perfrun.launcher <> - DirectoryMonitor object was created
+335 [14068] INFO perfrun.launcher <> - DirectoryMonitor: a callback was added
+335 [14068] INFO perfrun.launcher <> - DirectoryMonitor was started with pingTime = 1000
+336 [14068] INFO perfrun.launcher <> - DeadlineTimer is going to be constructed
+336 [14068] INFO perfrun.launcher <> - DeadlineTimer: a callback was added
+342 [14068] INFO perfrun.launcher <> - Launcher: resume the profiled application and  wait its termination or stop command
+214459 [36016] INFO perfrun.launcher <> - SignalHandler: signal #0 was caught
+214461 [2532] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214461 [35460] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214462 [22740] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214462 [34464] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214463 [17636] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214464 [39440] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214464 [27576] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214465 [26852] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214466 [7848] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214467 [39148] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214467 [35724] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214468 [32572] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214469 [26156] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214469 [29996] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214470 [26172] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214471 [37396] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214471 [24912] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214472 [13436] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214473 [38832] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214474 [26444] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214474 [31716] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214475 [11144] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214476 [34252] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214478 [39916] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214478 [25804] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214479 [27832] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214480 [9528] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214480 [31680] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214481 [24164] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214482 [39668] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214482 [16244] INFO perfrun.itt <> - detach itt controller
+214482 [16244] INFO perfrun.itt <> - detach itt controller done
+214482 [16244] INFO perfrun.tpss <> - stop tpss controller
+214482 [29928] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214483 [30836] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214484 [5184] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214485 [33084] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214485 [27024] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214486 [32308] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214487 [32144] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214487 [3760] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214488 [25300] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214489 [24820] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214490 [27824] ERROR perfrun.launcher <> - Messenger::say: Failed to get a thread handle when attaching to the process due to OS error (Отказано в доступе.
+). Data for the thread will not be collected.
+214513 [16244] INFO perfrun.sdk <> - De-allocating TMU: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0\systemcollector-3956-DESKTOP-G1MRM99.sc
+214538 [16244] INFO perfrun.system <> - closed the system trace file: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\r001hs\data.0\systemcollector-3956-DESKTOP-G1MRM99.sc
+214559 [14068] WARN perfrun.sdk <> - Unexpected exit status - -1073741510, at file: vcs\perfrun1\sdk\src\utils_win.cpp:541
+214559 [14068] INFO perfrun.launcher <> - Launcher: the profiled application was terminated  with exit code = -1073741510
+214600 [14068] INFO perfrun.launcher <> - Launcher: all plugins were stopped.
+214600 [14068] INFO perfrun.launcher <> - DeadlineTimer is going to be destroyed
+214600 [14068] INFO perfrun.launcher <> - DeadlineTimer was destroyed
+214600 [14068] INFO perfrun.launcher <> - DirectoryMonitor object was destroyed
+214600 [14068] WARN perfrun.launcher <> - Stop command is ignored because it is received when collection is already stopped, at file: vcs\perfrun1\launcher\src\command_handler.cpp:226
+214601 [14068] INFO perfrun.launcher <> - Application exit code: -1073741510
+214601 [14068] INFO perfrun.launcher <> - Exit code: 4

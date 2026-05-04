@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- <!DOCTYPE IntelParallelAdvisorSummaryCollection SYSTEM  "IntelParallelAdvisorSummaryCollection.dtd"> -->
+
+<IntelParallelAdvisorSummary version="" 
+                             kind="DATAKIND_SURVEY_EX" >
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="257"
+           routine="&lt;lambda_596d4864974ad3f4848b3c7f21d7d1ad&gt;::operator()"
+           is_vectorized="1"
+           self_time="6.237610E-02"
+           total_time="0.000000E+00"
+           trip_counts=""
+           func_instance="599"
+           priority="0">
+           <recommendation id="rec_sqrt_c" title="Enable the use of approximate sqrt instructions" confidence="1" gain="-1"/>
+  </hotspot>
+  <hotspot filename="E:\soft\VS\VC\Tools\MSVC\14.50.35717\include\xutility"
+           line_no="4923"
+           routine="std::_Copy_n_unchecked4&lt;Object *,unsigned __int64,Object *&gt;"
+           is_vectorized="0"
+           self_time="1.030092E-02"
+           total_time="0.000000E+00"
+           trip_counts=""
+           func_instance="164"
+           priority="0">
+           <recommendation id="rec_system_functions_move_c" title="Remove system function call(s) inside loop" confidence="1" gain="-1"/>
+  </hotspot>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\src\renderer.cpp"
+           line_no="271"
+           routine="Renderer::drawTrails"
+           is_vectorized="1"
+           self_time="9.764815E-03"
+           total_time="0.000000E+00"
+           trip_counts=""
+           func_instance="172"
+           priority="0">
+           <recommendation id="rec_type_conversions_smallest_c" title="Use the smallest data type" confidence="1" gain="-1"/>
+  </hotspot>
+  <hotspot filename="C:\vcpkg\buildtrees\glfw3\src\3.4-2448ff4533.clean\src\wgl_context.c"
+           line_no="139"
+           routine="choosePixelFormatWGL"
+           is_vectorized="0"
+           self_time="0.000000E+00"
+           total_time="0.000000E+00"
+           trip_counts=""
+           func_instance="72"
+           priority="0">
+           <recommendation id="rec_system_functions_move_c" title="Remove system function call(s) inside loop" confidence="1" gain="-1"/>
+  </hotspot>
+  <hotspot filename="C:\vcpkg\buildtrees\glfw3\src\3.4-2448ff4533.clean\src\wgl_context.c"
+           line_no="139"
+           routine="choosePixelFormatWGL"
+           is_vectorized="0"
+           self_time="0.000000E+00"
+           total_time="0.000000E+00"
+           trip_counts=""
+           func_instance="72"
+           priority="0">
+           <recommendation id="rec_indirect_call_move_c" title="Remove indirect call(s) inside loop" confidence="1" gain="-1"/>
+  </hotspot>
+</IntelParallelAdvisorSummary >

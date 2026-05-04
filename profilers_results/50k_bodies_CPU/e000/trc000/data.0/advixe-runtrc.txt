@@ -1,0 +1,10 @@
+
+=== Start: [2026/04/14 03:22:06] === 
+Peak bandwidth measurement started...
+Peak bandwidth measurement finished.
+Analysis started...
+Result file: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\my_roofline\e000\trc000\trc000.advixe 
+Application exit code: 0 
+Result file: C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\my_roofline\e000\trc000\trc000.advixe 
+Analysis completed
+=== End: [2026/04/14 03:24:56] === 

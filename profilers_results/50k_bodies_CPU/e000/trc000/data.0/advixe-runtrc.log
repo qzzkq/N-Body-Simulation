@@ -1,0 +1,1289 @@
+<?xml version="1.0" encoding="utf-8"?>
+<log version="1.0" tool="runtool">
+
+<msg id="1" tool="runtool">
+  <type>log-start</type>
+  <arg>2026/04/14 03:22:06</arg>
+</msg>
+<msg id="2" tool="runtool">
+  <type>bandwidth-measurement-starts</type>
+</msg>
+<msg id="3" tool="runtool">
+  <type>bandwidth-measurement-done</type>
+</msg>
+<msg id="4" tool="runtool">
+  <type>collector-starts</type>
+</msg>
+<msg id="5" tool="runtool">
+  <type>marker-file</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\my_roofline\e000\trc000\trc000.advixe</arg>
+</msg>
+<msg id="6" tool="trc">
+  <type>PROCESS_START</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe</arg>
+  <arg>5980</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="7" tool="trc">
+  <type>PROCESS_ANALYSIS_MODE</type>
+  <arg>full</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="8" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe</arg>
+  <arg>0x7ff6b4ba0000</arg>
+  <arg>0x7ff6b4c86fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="9" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\KERNELBASE.dll</arg>
+  <arg>0x7ff9c4600000</arg>
+  <arg>0x7ff9c48f5fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="10" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\KERNEL32.DLL</arg>
+  <arg>0x7ff9c64b0000</arg>
+  <arg>0x7ff9c6571fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="11" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\ntdll.dll</arg>
+  <arg>0x7ff9c6ef0000</arg>
+  <arg>0x7ff9c70e7fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="12" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\ucrtbase.dll</arg>
+  <arg>0x7ff9c4900000</arg>
+  <arg>0x7ff9c49fffff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="13" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\glew32.dll</arg>
+  <arg>0x7ff9614a0000</arg>
+  <arg>0x7ff961525fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="14" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\hdf5_cpp.dll</arg>
+  <arg>0x7ff964df0000</arg>
+  <arg>0x7ff964e3dfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="15" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\OPENGL32.dll</arg>
+  <arg>0x7ff9464f0000</arg>
+  <arg>0x7ff946617fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="16" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\msvcrt.dll</arg>
+  <arg>0x7ff9c6cb0000</arg>
+  <arg>0x7ff9c6d4dfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="17" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\glfw3.dll</arg>
+  <arg>0x7ff964ab0000</arg>
+  <arg>0x7ff964aeffff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="18" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\ADVAPI32.dll</arg>
+  <arg>0x7ff9c5130000</arg>
+  <arg>0x7ff9c51e0fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="19" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\sechost.dll</arg>
+  <arg>0x7ff9c6580000</arg>
+  <arg>0x7ff9c661efff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="20" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\RPCRT4.dll</arg>
+  <arg>0x7ff9c5960000</arg>
+  <arg>0x7ff9c5a7ffff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="21" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\bcrypt.dll</arg>
+  <arg>0x7ff9c4e30000</arg>
+  <arg>0x7ff9c4e56fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="22" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\USER32.dll</arg>
+  <arg>0x7ff9c6b00000</arg>
+  <arg>0x7ff9c6ca0fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="23" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\win32u.dll</arg>
+  <arg>0x7ff9c4b80000</arg>
+  <arg>0x7ff9c4ba1fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:23 2026</timestamp>
+</msg>
+<msg id="24" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\GDI32.dll</arg>
+  <arg>0x7ff9c5060000</arg>
+  <arg>0x7ff9c508afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="25" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\gdi32full.dll</arg>
+  <arg>0x7ff9c4d10000</arg>
+  <arg>0x7ff9c4e28fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="26" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\msvcp_win.dll</arg>
+  <arg>0x7ff9c4a90000</arg>
+  <arg>0x7ff9c4b2cfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="27" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\SHELL32.dll</arg>
+  <arg>0x7ff9c5aa0000</arg>
+  <arg>0x7ff9c620ffff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="28" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\combase.dll</arg>
+  <arg>0x7ff9c5250000</arg>
+  <arg>0x7ff9c55a3fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="29" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VCRUNTIME140.dll</arg>
+  <arg>0x7ff9a0b70000</arg>
+  <arg>0x7ff9a0b8dfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="30" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\MSVCP140.dll</arg>
+  <arg>0x7ff9a0b90000</arg>
+  <arg>0x7ff9a0c17fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="31" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VCRUNTIME140_1.dll</arg>
+  <arg>0x7ff9a0e30000</arg>
+  <arg>0x7ff9a0e3afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="32" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\hdf5.dll</arg>
+  <arg>0x7ff93a430000</arg>
+  <arg>0x7ff93a82efff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="33" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\GLU32.dll</arg>
+  <arg>0x7ff964190000</arg>
+  <arg>0x7ff9641bbfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="34" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\SHLWAPI.dll</arg>
+  <arg>0x7ff9c6210000</arg>
+  <arg>0x7ff9c626afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="35" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\szip.dll</arg>
+  <arg>0x7ff9a9c30000</arg>
+  <arg>0x7ff9a9c3cfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="36" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\zlib1.dll</arg>
+  <arg>0x7ff9abb70000</arg>
+  <arg>0x7ff9abb89fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:24 2026</timestamp>
+</msg>
+<msg id="37" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\IMM32.DLL</arg>
+  <arg>0x7ff9c5100000</arg>
+  <arg>0x7ff9c512efff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="38" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dinput8.dll</arg>
+  <arg>0x7ff991520000</arg>
+  <arg>0x7ff991564fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="39" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\xinput1_4.dll</arg>
+  <arg>0x7ff98bae0000</arg>
+  <arg>0x7ff98baf0fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="40" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\cfgmgr32.dll</arg>
+  <arg>0x7ff9c4b30000</arg>
+  <arg>0x7ff9c4b7dfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="41" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\DEVOBJ.dll</arg>
+  <arg>0x7ff9c42e0000</arg>
+  <arg>0x7ff9c4312fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="42" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dwmapi.dll</arg>
+  <arg>0x7ff9c11b0000</arg>
+  <arg>0x7ff9c11ddfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="43" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\inputhost.dll</arg>
+  <arg>0x7ff9bbc40000</arg>
+  <arg>0x7ff9bbd91fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="44" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\shcore.dll</arg>
+  <arg>0x7ff9c5630000</arg>
+  <arg>0x7ff9c56dcfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="45" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\OLEAUT32.dll</arg>
+  <arg>0x7ff9c57a0000</arg>
+  <arg>0x7ff9c586cfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="46" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CoreMessaging.dll</arg>
+  <arg>0x7ff9c09b0000</arg>
+  <arg>0x7ff9c0aa1fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="47" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\WS2_32.dll</arg>
+  <arg>0x7ff9c6620000</arg>
+  <arg>0x7ff9c668afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="48" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\PROPSYS.dll</arg>
+  <arg>0x7ff9bf0c0000</arg>
+  <arg>0x7ff9bf1b3fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="49" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\wintypes.dll</arg>
+  <arg>0x7ff9bff80000</arg>
+  <arg>0x7ff9c00d6fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="50" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CoreUIComponents.dll</arg>
+  <arg>0x7ff9c0650000</arg>
+  <arg>0x7ff9c09aafff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="51" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\bcryptPrimitives.dll</arg>
+  <arg>0x7ff9c4a00000</arg>
+  <arg>0x7ff9c4a81fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="52" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\ntmarta.dll</arg>
+  <arg>0x7ff9c37e0000</arg>
+  <arg>0x7ff9c3812fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="53" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\kernel.appcore.dll</arg>
+  <arg>0x7ff9c2d80000</arg>
+  <arg>0x7ff9c2d91fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:25 2026</timestamp>
+</msg>
+<msg id="54" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\system32\uxtheme.dll</arg>
+  <arg>0x7ff9c1030000</arg>
+  <arg>0x7ff9c10cdfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:26 2026</timestamp>
+</msg>
+<msg id="55" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\MSCTF.dll</arg>
+  <arg>0x7ff9c4ee0000</arg>
+  <arg>0x7ff9c4ff4fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:26 2026</timestamp>
+</msg>
+<msg id="56" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\clbcatq.dll</arg>
+  <arg>0x7ff9c56e0000</arg>
+  <arg>0x7ff9c5788fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="57" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\AppXDeploymentClient.dll</arg>
+  <arg>0x7ff9be190000</arg>
+  <arg>0x7ff9be295fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="58" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\AppXDeploymentClient.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="59" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_7840b4313191ae17\nvoglv64.dll</arg>
+  <arg>0x7ff949bb0000</arg>
+  <arg>0x7ff94c4d4fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="60" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\SETUPAPI.dll</arg>
+  <arg>0x7ff9c6690000</arg>
+  <arg>0x7ff9c6afffff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="61" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\ole32.dll</arg>
+  <arg>0x7ff9c6d50000</arg>
+  <arg>0x7ff9c6e7afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="62" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\WTSAPI32.dll</arg>
+  <arg>0x7ff9bf900000</arg>
+  <arg>0x7ff9bf913fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="63" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VERSION.dll</arg>
+  <arg>0x7ff9be720000</arg>
+  <arg>0x7ff9be729fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:27 2026</timestamp>
+</msg>
+<msg id="64" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\msasn1.dll</arg>
+  <arg>0x7ff9c4110000</arg>
+  <arg>0x7ff9c4121fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="65" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\cryptnet.dll</arg>
+  <arg>0x7ff9be6e0000</arg>
+  <arg>0x7ff9be710fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="66" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\CRYPT32.dll</arg>
+  <arg>0x7ff9c4bb0000</arg>
+  <arg>0x7ff9c4d0cfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="67" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\cryptbase.dll</arg>
+  <arg>0x7ff9c3ef0000</arg>
+  <arg>0x7ff9c3efbfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="68" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\wldp.dll</arg>
+  <arg>0x7ff9c3f80000</arg>
+  <arg>0x7ff9c3faafff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="69" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\drvstore.dll</arg>
+  <arg>0x7ff9be2a0000</arg>
+  <arg>0x7ff9be3e6fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="70" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\WINTRUST.dll</arg>
+  <arg>0x7ff9c4e60000</arg>
+  <arg>0x7ff9c4ed2fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:28 2026</timestamp>
+</msg>
+<msg id="71" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\imagehlp.dll</arg>
+  <arg>0x7ff9c5a80000</arg>
+  <arg>0x7ff9c5a9cfff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:29 2026</timestamp>
+</msg>
+<msg id="72" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CRYPTSP.dll</arg>
+  <arg>0x7ff9c3ed0000</arg>
+  <arg>0x7ff9c3ee7fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:29 2026</timestamp>
+</msg>
+<msg id="73" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\system32\rsaenh.dll</arg>
+  <arg>0x7ff9c3520000</arg>
+  <arg>0x7ff9c3557fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:29 2026</timestamp>
+</msg>
+<msg id="74" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_7840b4313191ae17\nvgpucomp64.dll</arg>
+  <arg>0x7ff9b5210000</arg>
+  <arg>0x7ff9b9f0efff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:29 2026</timestamp>
+</msg>
+<msg id="75" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\windows.storage.dll</arg>
+  <arg>0x7ff9c25c0000</arg>
+  <arg>0x7ff9c2d64fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:34 2026</timestamp>
+</msg>
+<msg id="76" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dxcore.dll</arg>
+  <arg>0x7ff9bccd0000</arg>
+  <arg>0x7ff9bcd0afff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:35 2026</timestamp>
+</msg>
+<msg id="77" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\system32\nvspcap64.dll</arg>
+  <arg>0x7ff99a630000</arg>
+  <arg>0x7ff99a776fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:35 2026</timestamp>
+</msg>
+<msg id="78" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\profapi.dll</arg>
+  <arg>0x7ff9c4480000</arg>
+  <arg>0x7ff9c44a3fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:35 2026</timestamp>
+</msg>
+<msg id="79" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <arg>0x7ff9c5870000</arg>
+  <arg>0x7ff9c5877fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:35 2026</timestamp>
+</msg>
+<msg id="80" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <arg>0x7ff9c1f80000</arg>
+  <arg>0x7ff9c2180fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:35 2026</timestamp>
+</msg>
+<msg id="81" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="82" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="83" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <arg>0x7ff9c5870000</arg>
+  <arg>0x7ff9c5877fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="84" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <arg>0x7ff9c1f80000</arg>
+  <arg>0x7ff9c2180fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="85" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="86" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="87" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <arg>0x7ff9c5870000</arg>
+  <arg>0x7ff9c5877fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="88" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <arg>0x7ff9c1f80000</arg>
+  <arg>0x7ff9c2180fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="89" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="90" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="91" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <arg>0x7ff9c5870000</arg>
+  <arg>0x7ff9c5877fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="92" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <arg>0x7ff9c1f80000</arg>
+  <arg>0x7ff9c2180fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="93" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\PSAPI.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="94" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dbghelp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:36 2026</timestamp>
+</msg>
+<msg id="95" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\powrprof.dll</arg>
+  <arg>0x7ff9c3a90000</arg>
+  <arg>0x7ff9c3adafff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:37 2026</timestamp>
+</msg>
+<msg id="96" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\UMPDC.dll</arg>
+  <arg>0x7ff9c3950000</arg>
+  <arg>0x7ff9c3961fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:37 2026</timestamp>
+</msg>
+<msg id="97" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\WINSTA.dll</arg>
+  <arg>0x7ff9c3770000</arg>
+  <arg>0x7ff9c37d2fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:37 2026</timestamp>
+</msg>
+<msg id="98" tool="trc">
+  <type>LOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\textinputframework.dll</arg>
+  <arg>0x7ff9bbda0000</arg>
+  <arg>0x7ff9bbe98fff</arg>
+  <arg>yes</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:22:38 2026</timestamp>
+</msg>
+<msg id="99" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="100" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\KERNELBASE.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="101" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\KERNEL32.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="102" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\ntdll.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="103" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\ucrtbase.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="104" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\glew32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="105" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\hdf5_cpp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="106" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\OPENGL32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="107" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\msvcrt.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="108" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\glfw3.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="109" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\ADVAPI32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="110" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\sechost.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="111" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\RPCRT4.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="112" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\bcrypt.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="113" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\USER32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="114" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\win32u.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="115" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\GDI32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="116" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\gdi32full.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="117" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\msvcp_win.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="118" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\SHELL32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="119" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\combase.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="120" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VCRUNTIME140.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="121" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\MSVCP140.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="122" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VCRUNTIME140_1.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="123" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\hdf5.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="124" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\GLU32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="125" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\SHLWAPI.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="126" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\szip.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="127" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\zlib1.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="128" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\IMM32.DLL</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="129" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dinput8.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="130" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\xinput1_4.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="131" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\cfgmgr32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="132" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\DEVOBJ.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="133" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dwmapi.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="134" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\inputhost.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="135" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\shcore.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="136" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\OLEAUT32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="137" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CoreMessaging.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="138" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\WS2_32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="139" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\PROPSYS.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="140" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\wintypes.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="141" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CoreUIComponents.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="142" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\bcryptPrimitives.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="143" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\ntmarta.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="144" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\kernel.appcore.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="145" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\system32\uxtheme.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="146" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\MSCTF.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="147" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\clbcatq.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="148" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_7840b4313191ae17\nvoglv64.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="149" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\SETUPAPI.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="150" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\ole32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="151" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\WTSAPI32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="152" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\VERSION.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="153" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\msasn1.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="154" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\cryptnet.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="155" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\CRYPT32.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="156" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\cryptbase.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="157" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\wldp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="158" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\drvstore.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="159" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\WINTRUST.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="160" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\imagehlp.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="161" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\CRYPTSP.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="162" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\system32\rsaenh.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="163" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\System32\DriverStore\FileRepository\nv_dispi.inf_amd64_7840b4313191ae17\nvgpucomp64.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="164" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\windows.storage.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="165" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\dxcore.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="166" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\system32\nvspcap64.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="167" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\profapi.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="168" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\powrprof.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="169" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\UMPDC.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="170" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\WINSTA.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="171" tool="trc">
+  <type>UNLOAD_MODULE</type>
+  <arg>C:\Windows\SYSTEM32\textinputframework.dll</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="172" tool="trc">
+  <type>PROCESS_FINISH</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\Simulate.exe</arg>
+  <arg>5980</arg>
+  <arg>0x0</arg>
+  <severity>INFO</severity>
+  <timestamp>Tue Apr 14 03:24:52 2026</timestamp>
+</msg>
+<msg id="173" tool="runtool">
+  <type>app-exit-code</type>
+  <arg>0</arg>
+</msg>
+<msg id="174" tool="runtool">
+  <type>marker-file</type>
+  <arg>C:\Users\yojik\Desktop\project\N-Body-Simulation\project\build\my_roofline\e000\trc000\trc000.advixe</arg>
+</msg>
+<msg id="175" tool="runtool">
+  <type>collector-done</type>
+</msg>
+<msg id="176" tool="runtool">
+  <type>log-end</type>
+  <arg>2026/04/14 03:24:56</arg>
+</msg>
+
+</log>
+

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+
+<!-- <!DOCTYPE IntelParallelAdvisorSummaryCollection SYSTEM  "IntelParallelAdvisorSummaryCollection.dtd"> -->
+
+<IntelParallelAdvisorSummary version="" 
+                             kind="DATAKIND_SURVEY_EX" >
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="257"
+           routine="&lt;lambda_596d4864974ad3f4848b3c7f21d7d1ad&gt;::operator()"
+           is_vectorized="1"
+           self_time="4.922720E-01"
+           total_time="6.746725E+01"
+           trip_counts=""
+           func_instance="430"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="63"
+           routine="insertBody"
+           is_vectorized="0"
+           self_time="4.274524E-01"
+           total_time="1.686997E+00"
+           trip_counts=""
+           func_instance="73"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="275"
+           routine="simulationStepBarnesHutCPU"
+           is_vectorized="1"
+           self_time="4.670036E-02"
+           total_time="4.670036E-02"
+           trip_counts=""
+           func_instance="80"
+           priority="0"/>
+  <hotspot filename="C:\Users\yojik\Desktop\project\N-Body-Simulation\project\algo\barnes_hut.cpp"
+           line_no="307"
+           routine="simulationStepBarnesHutCPU"
+           is_vectorized="1"
+           self_time="4.645492E-02"
+           total_time="4.645492E-02"
+           trip_counts=""
+           func_instance="85"
+           priority="0"/>
+  <hotspot filename="E:\soft\VS\VC\Tools\MSVC\14.50.35717\include\xutility"
+           line_no="4923"
+           routine="std::_Copy_n_unchecked4&lt;Object *,unsigned __int64,Object *&gt;"
+           is_vectorized="0"
+           self_time="4.578009E-02"
+           total_time="7.633690E-02"
+           trip_counts=""
+           func_instance="97"
+           priority="0"/>
+</IntelParallelAdvisorSummary >
