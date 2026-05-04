@@ -17,9 +17,10 @@ find_package(GLEW   REQUIRED)
 find_package(glfw3  REQUIRED)
 find_package(glm    REQUIRED)
 find_package(HDF5   REQUIRED COMPONENTS C CXX HL)
+find_package(OpenMP REQUIRED)
 
 if(WIN32)
-    add_definitions(-DGLEW_STATIC)
+    add_compile_definitions(NOMINMAX)
 endif()
 
 # ---------------------------------------------------------
@@ -73,7 +74,8 @@ target_link_libraries(Core PUBLIC
     GLEW::GLEW
     glfw
     glm::glm
-) 
+    OpenMP::OpenMP_CXX
+)
 
 if(UNIX AND NOT WIN32)
     target_link_libraries(Core PUBLIC X11 Xrandr Xi Xxf86vm Xcursor pthread dl)
@@ -81,7 +83,28 @@ endif()
 
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(Core PUBLIC CUDA::cudart)
-    set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES "60;70;80;86")
+    set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES "80;86;89")
+endif()
+
+if(MSVC)
+    # Включаем современный OpenMP для поддержки max и simd
+    target_compile_options(Core PRIVATE 
+        $<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>
+        $<$<COMPILE_LANGUAGE:CXX>:-openmp:llvm>
+        $<$<COMPILE_LANGUAGE:CXX>:-openmp:experimental>
+    )
+    
+    if(CMAKE_CUDA_COMPILER)
+        # Убираем ворнинги GLM в CUDA и прокидываем препроцессор
+        target_compile_options(Core PRIVATE 
+            $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>
+            $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
+        )
+        
+        target_compile_definitions(Core PRIVATE 
+            $<$<COMPILE_LANGUAGE:CUDA>:CCCL_IGNORE_MSVC_TRADITIONAL_PREPROCESSOR_WARNING>
+        )
+    endif()
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
@@ -130,3 +153,5 @@ if(WIN32)
         COMMAND_EXPAND_LISTS
     )
 endif()
+
+include(CPack)
