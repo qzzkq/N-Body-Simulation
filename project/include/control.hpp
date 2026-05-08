@@ -140,5 +140,5 @@ private:
     std::vector<Object>& objs_;            ///< Массив тел (для интерактивного добавления).
     Camera&              camera_;          ///< Камера наблюдателя.
     SimState&            state_;           ///< Состояние симуляции.
-    float                cameraMoveScale_; ///< Множитель скорости WASD. Регулируется Shift+±.
+    float                cameraMoveScale_ = 1.0f; ///< Множитель скорости WASD. Регулируется Shift+±.
 };
