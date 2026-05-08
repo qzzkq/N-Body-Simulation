@@ -14,6 +14,8 @@
 #include <array>
 #include <string>
 #include <cstring>
+#include <chrono> // Добавлено для замера времени без GLFW
+#include <memory> // Добавлено для std::unique_ptr
 #include "object.hpp"
 #include "graphic_state.hpp"
 #include "renderer.hpp"
@@ -82,53 +84,55 @@ int main(int argc, char* argv[]) {
     SetConsoleCP(65001);
 #endif
 
-    bool is_cli = (argc > 1); // Флаг: запущен ли с аргументами командной строки
+    bool is_cli = (argc > 1);
 
-    bool fullscreen = false;
-    bool maximized = true;
-
-    Renderer renderer; 
-
-    if (!renderer.init(1280, 720, "N-Body simulation", fullscreen, maximized)) {
-        std::cerr << "Window or OpenGL context creation failed.\n";
-        return -1;
+    bool isRealTime;
+    if (!is_cli) {
+        std::cout << "Режим реального времени (визуализация)? [1 - Да / 0 - Нет]: " << std::flush;
+        std::cin >> isRealTime;
+    } else {
+        isRealTime = (getCmdOption(argc, argv, "--realtime", "1") == "1");
     }
 
-    // Дальняя плоскость в AU (логарифмический Z в шейдерах): ~10^10 AU — очень большая дальность видения.
-    renderer.setProjection(65.0f, 1.0f, 1.0e10f);
+    Renderer renderer; 
+    std::unique_ptr<Control> control = nullptr;
+    RenderMode renderMode = RenderMode::Sphere;
+
+    if (isRealTime) {
+        bool fullscreen = false;
+        bool maximized = true;
+
+        if (!renderer.init(1280, 720, "N-Body simulation", fullscreen, maximized)) {
+            std::cerr << "Window or OpenGL context creation failed.\n";
+            return -1;
+        }
+
+        renderer.setProjection(65.0f, 1.0f, 1.0e10f);
+
+        int mode;
+        if (!is_cli) {
+            std::cout << "Кубы/шары/точка [0/1/2]\n";
+            std::cin >> mode;
+        } else {
+            mode = std::stoi(getCmdOption(argc, argv, "--render", "1"));
+        }
+
+        switch (mode){
+            case 0: renderMode = RenderMode::Cubes; break;
+            case 1: renderMode = RenderMode::Sphere; break;
+            case 2: renderMode = RenderMode::Points; break;
+            default: renderMode = RenderMode::Sphere; break;
+        }
+        renderer.setRenderMode(renderMode);
+    }
+
     using Handler = void(*)(std::vector<Object>& objs, double dt, bool pause, bool forceSync);
     Handler simulationStep = nullptr;
-
-    RenderMode renderMode = RenderMode::Sphere;
     auto scenarioManager = CreateDefaultManager();
 
     bool loaded = false;
     bool loadedColorsFromTxt = false;
     int mode;
-    
-    // --- 1. Выбор рендера ---
-    if (!is_cli) {
-        std::cout << "Кубы/шары/точка [0/1/2]\n";
-        std::cin >> mode;
-    } else {
-        mode = std::stoi(getCmdOption(argc, argv, "--render", "1"));
-    }
-
-    switch (mode){
-        case 0:
-            renderMode = RenderMode::Cubes;
-            break;
-        case 1:
-            renderMode = RenderMode::Sphere;
-            break;
-        case 2:
-            renderMode = RenderMode::Points;
-            break;
-        default:
-            renderMode = RenderMode::Sphere;
-            break;
-    }
-    renderer.setRenderMode(renderMode);
 
     // --- 2. Выбор алгоритма ---
 #ifdef USE_CUDA
@@ -155,16 +159,10 @@ int main(int argc, char* argv[]) {
 #endif
 
     switch(mode) {
-        case 1:
-            simulationStep = &simulationStepBrutForceCPU;
-            break;
-        case 2:
-            simulationStep = &simulationStepBarnesHutCPU;
-            break;
+        case 1: simulationStep = &simulationStepBrutForceCPU; break;
+        case 2: simulationStep = &simulationStepBarnesHutCPU; break;
 #ifdef USE_CUDA
-        case 3:
-            simulationStep = &simulationStepBarnesHutCUDA;
-            break;
+        case 3: simulationStep = &simulationStepBarnesHutCUDA; break;
 #endif
         default:
             std::cout << "Неверный выбор, используем брутфорс.\n";
@@ -212,9 +210,7 @@ int main(int argc, char* argv[]) {
                 bool h5HasColors = false;
                 if (LoadObjectsFromFile(files[idx-1], "Particles", objs, &graphics, &h5HasColors)) {
                     loaded = true;
-                    if (h5HasColors) {
-                        loadedColorsFromTxt = true;
-                    }
+                    if (h5HasColors) loadedColorsFromTxt = true;
                     std::cout << "Loaded " << objs.size() << " objects\n";
                 }
             }
@@ -223,9 +219,7 @@ int main(int argc, char* argv[]) {
             bool h5HasColors = false;
             if (!h5path.empty() && LoadObjectsFromFile(h5path, "Particles", objs, &graphics, &h5HasColors)) {
                 loaded = true;
-                if (h5HasColors) {
-                    loadedColorsFromTxt = true;
-                }
+                if (h5HasColors) loadedColorsFromTxt = true;
                 std::cout << "Loaded " << objs.size() << " objects\n";
             } else {
                 std::cout << "Failed to load HDF5 from path: " << h5path << "\n";
@@ -261,11 +255,11 @@ int main(int argc, char* argv[]) {
             params.count = std::stoi(getCmdOption(argc, argv, "--bodies", "100"));
         }
 
-        params.centralMass = 1.0;      // 1 масса Солнца
-        params.baseMass    = 3.0e-6;   // Масса Земли в солнечных
-        params.minRadius   = 5.0f;     // AU
-        params.maxRadius   = 40.0f;    // AU
-        params.spread      = 2.0f;     // AU
+        params.centralMass = 1.0;      
+        params.baseMass    = 3.0e-6;   
+        params.minRadius   = 5.0f;     
+        params.maxRadius   = 40.0f;    
+        params.spread      = 2.0f;     
 
         std::vector<std::string> scenNames = scenarioManager->getNames();
         size_t choice = 0;
@@ -278,7 +272,6 @@ int main(int argc, char* argv[]) {
             std::cout << "Ваш выбор: ";
             std::cin >> choice;
         } else {
-            // В питоне ComboBox index начинается с 0, а у нас в консоли с 1. Переводим
             choice = std::stoi(getCmdOption(argc, argv, "--scenario", "0")) + 1;
         }
         
@@ -326,8 +319,8 @@ int main(int argc, char* argv[]) {
     WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
     ++frameIndex;
     
-    BodySystem bodySystem(objs); // создание сохрянем информацию о системе
-    bodySystem.transPointToSystem(objs); // переходим в систему объектов
+    BodySystem bodySystem(objs); 
+    bodySystem.transPointToSystem(objs); 
 
     const double initialEnergy = physics::calculateTotalEnergy(objs);
     double energyCache = initialEnergy;
@@ -335,24 +328,19 @@ int main(int argc, char* argv[]) {
     Camera cam;
     SimState state; 
 
-    Control control(renderer.getWindow(), objs, cam, state);
-    control.attach();
-    int counter = 0;
-    double lastTime = glfwGetTime();
-    double accumulator = 0.0;
-
-    bool isRealTime;
-    if (!is_cli) {
-        std::cout << "Режим реального времени? [1 - Да / 0 Нет]: " << std::flush;
-        std::cin >> isRealTime;
-    } else {
-        isRealTime = (getCmdOption(argc, argv, "--realtime", "1") == "1");
-    }
-
     int stepCounter = 0;
     int frameCounter = 0;
 
+    // =========================================================
+    // ЦИКЛ СИМУЛЯЦИИ (РЕАЛТАЙМ ИЛИ БЕЙКИНГ)
+    // =========================================================
     if (isRealTime) {
+        control = std::make_unique<Control>(renderer.getWindow(), objs, cam, state);
+        control->attach();
+
+        double lastTime = glfwGetTime();
+        double accumulator = 0.0;
+
         while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && !g_Interrupt) {
             double now = glfwGetTime();
             double frameRealDt = now - lastTime;
@@ -362,7 +350,7 @@ int main(int argc, char* argv[]) {
             frameRealDt *= state.timeScale;
             if (frameRealDt > 0.1) frameRealDt = 0.1;
             if (frameRealDt < 0.0) frameRealDt = 0.0;
-            // Зажатый Shift: время симуляции не идёт (удобно летать камерой / менять Shift+− скорость камеры).
+            
             GLFWwindow* win = renderer.getWindow();
             const bool shiftFreeze = (glfwGetKey(win, GLFW_KEY_LEFT_SHIFT) == GLFW_PRESS)
                 || (glfwGetKey(win, GLFW_KEY_RIGHT_SHIFT) == GLFW_PRESS);
@@ -371,7 +359,6 @@ int main(int argc, char* argv[]) {
             }
 
             int substeps = 0;
-
             constexpr int MAX_SUBSTEPS = 100000;
             while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS && !g_Interrupt) {
                 simulationStep(objs, fixedDt, state.pause, false);
@@ -386,8 +373,7 @@ int main(int argc, char* argv[]) {
                 accumulator = 0.0;
             }
 
-            control.updateCameraFromKeys();
-
+            control->updateCameraFromKeys();
             renderer.renderFrame(objs, graphics, cam);
             ++frameCounter;
 
@@ -396,7 +382,7 @@ int main(int argc, char* argv[]) {
             
             std::snprintf(title, sizeof(title),
                   "REAL-TIME | Sim: %.1fx | Cam: %.2fx | FPS: %.0f | Obj: %zu | Time: %.2f%s",
-                  state.timeScale, control.getCameraMoveScale(), fps, objs.size(), gSimTime,
+                  state.timeScale, control->getCameraMoveScale(), fps, objs.size(), gSimTime,
                   shiftFreeze ? " | [SHIFT freeze]" : "");
             glfwSetWindowTitle(renderer.getWindow(), title);
 
@@ -409,48 +395,38 @@ int main(int argc, char* argv[]) {
         
         {
             const double yearsBetweenSaves = fixedDt * static_cast<double>(saveIntervalSteps);
-            const double mbPerSimYear =
-                (yearsBetweenSaves > 0.0 && !objs.empty())
+            const double mbPerSimYear = (yearsBetweenSaves > 0.0 && !objs.empty())
                     ? (static_cast<double>(objs.size()) * 3.0 * static_cast<double>(sizeof(float))
-                       / (yearsBetweenSaves * 1024.0 * 1024.0))
-                    : 0.0;
+                       / (yearsBetweenSaves * 1024.0 * 1024.0)) : 0.0;
                     
             if (!is_cli) {
                 std::cout << std::fixed << std::setprecision(6);
-                std::cout << "Просчёт (не в реальном времени). Один шаг dt = " << fixedDt << " года.\n";
+                std::cout << "\nПросчёт (не в реальном времени). Один шаг dt = " << fixedDt << " года.\n";
                 std::cout << "Между сохранёнными кадрами: " << yearsBetweenSaves << " года ("
-                          << saveIntervalSteps << " шаг(ов)). Ориентир размера треков: ~" << std::setprecision(3)
-                          << mbPerSimYear << " МБ на 1 год симуляции, ~" << std::setprecision(6)
-                          << " (оценка по float-позициям; deflate в HDF5 обычно меньше).\n";
-                std::cout << std::setprecision(15);
+                          << saveIntervalSteps << " шаг(ов)). Ориентир размера: ~" << std::setprecision(3)
+                          << mbPerSimYear << " МБ на 1 год симуляции.\n";
                 std::cout << "На какое симуляционное время просчитываем? (годы): " << std::flush;
                 std::cin >> targetTime;
             } else {
                 targetTime = std::stod(getCmdOption(argc, argv, "--target", "10.0"));
             }
-            
-            if (targetTime > 0.0 && mbPerSimYear > 0.0 && !is_cli) {
-                std::cout << std::fixed << std::setprecision(2)
-                          << "Ориентир объёма треков на весь прогон: ~" << (mbPerSimYear * targetTime)
-                          << " МБ (грубо, без учёта initial_data и сжатия).\n";
-            }
         }
         
-        double bakeStartRealTime = glfwGetTime();
+        // Используем std::chrono вместо glfwGetTime()
+        auto bakeStartRealTime = std::chrono::high_resolution_clock::now();
+        std::cout << "Начинаем расчет (headless режим)..." << std::endl;
 
-        glfwSwapInterval(0);
-        std::cout << "Начинаем расчет..." << std::endl;
-
-        while (!glfwWindowShouldClose(renderer.getWindow()) && state.running && gSimTime < targetTime && !g_Interrupt) {
+        while (state.running && gSimTime < targetTime && !g_Interrupt) {
             simulationStep(objs, fixedDt, false, false);
             gSimTime += fixedDt;
             stepCounter += 1;
             
             if (stepCounter % (1 * 10) == 0) {
-                glfwPollEvents();
-
                 double progress = (gSimTime / targetTime) * 100.0;
-                double elapsed = glfwGetTime() - bakeStartRealTime;
+                auto now = std::chrono::high_resolution_clock::now();
+                std::chrono::duration<double> elapsed_chrono = now - bakeStartRealTime;
+                double elapsed = elapsed_chrono.count();
+                
                 double progress_dec = gSimTime / targetTime;
                 double etaSeconds = 0.0;
                 if (progress_dec > 0.001) {
@@ -461,22 +437,22 @@ int main(int argc, char* argv[]) {
                 int etaMin = etaTotalSec / 60;
                 int etaSec = etaTotalSec % 60;
                 
-                std::snprintf(title, sizeof(title),
-                      "BAKING... %.1f%% | ETA: %02d:%02d | Time: %.2f / %.2f | Saved: %zu",
-                      progress, etaMin, etaSec, gSimTime, targetTime, frameIndex);
-                glfwSetWindowTitle(renderer.getWindow(), title);
-                std::cout << "PROGRESS:" << progress << std::endl;
+                std::cout << "\rBAKING... " << std::fixed << std::setprecision(1) << progress 
+                          << "% | ETA: " << std::setfill('0') << std::setw(2) << etaMin << ":" 
+                          << std::setw(2) << etaSec 
+                          << " | Time: " << std::setprecision(2) << gSimTime << " / " << targetTime 
+                          << " | Saved: " << frameIndex << std::flush;
             }
             if (stepCounter % saveIntervalSteps == 0) {
                 WriteSimulationFrame(framesFile, objs, graphics, frameIndex);
                 ++frameIndex;
             }
         }
-        std::cout << "Расчет завершен за " << (static_cast<int>(time(NULL)) - startTime) << " сек.\n";
+        std::cout << "\nРасчет завершен за " << (static_cast<int>(time(NULL)) - startTime) << " сек.\n";
     }
 
     if (g_Interrupt) {
-        std::cout << "Получен SIGINT (Ctrl+C). Завершаем симуляцию и сохраняем текущее состояние...\n";
+        std::cout << "\nПолучен SIGINT (Ctrl+C). Завершаем симуляцию и сохраняем текущее состояние...\n";
     }
 
     simulationStep(objs, 0.0, true, true);
