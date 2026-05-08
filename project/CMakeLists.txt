@@ -3,6 +3,7 @@ project(NBodySimulation LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
@@ -26,17 +27,22 @@ endif()
 # ---------------------------------------------------------
 # 2. Определение CUDA
 # ---------------------------------------------------------
-include(CheckLanguage)
-check_language(CUDA)
-
-if(CMAKE_CUDA_COMPILER)
-    enable_language(CUDA)
-    find_package(CUDAToolkit REQUIRED)
-    add_compile_definitions(USE_CUDA)
-    # Реализации CUDA могут лежать не только в src/.
-    file(GLOB CUDA_SOURCES "src/*.cu" "algo/*.cu")
-else()
+if(WIN32 AND NOT MSVC)
+    message(WARNING "Сборка с CUDA на Windows требует MSVC (Visual Studio). MinGW/MSYS2 не поддерживается. Поддержка CUDA отключена.")
     set(CUDA_SOURCES "")
+else()
+    include(CheckLanguage)
+    check_language(CUDA)
+
+    if(CMAKE_CUDA_COMPILER)
+        enable_language(CUDA)
+        find_package(CUDAToolkit REQUIRED)
+        add_compile_definitions(USE_CUDA)
+        file(GLOB CUDA_SOURCES CONFIGURE_DEPENDS "src/*.cu" "algo/*.cu")
+    else()
+        message(STATUS "CUDA компилятор не найден. Сборка продолжится без поддержки GPU.")
+        set(CUDA_SOURCES "")
+    endif()
 endif()
 
 # ---------------------------------------------------------
@@ -57,13 +63,15 @@ set(CORE_SRC
 
 add_library(Core STATIC ${CORE_SRC})
 
-target_include_directories(Core PUBLIC
-    include
-    algo
-    src
-    ${HDF5_INCLUDE_DIRS}
-    ${GLEW_INCLUDE_DIRS}
-    ${glm_INCLUDE_DIRS}
+target_include_directories(Core 
+    PUBLIC 
+        include 
+        algo 
+        ${HDF5_INCLUDE_DIRS}
+        ${GLEW_INCLUDE_DIRS}
+        ${glm_INCLUDE_DIRS}
+    PRIVATE 
+        src  
 )
 
 target_link_libraries(Core PUBLIC
@@ -87,7 +95,6 @@ if(CMAKE_CUDA_COMPILER)
 endif()
 
 if(MSVC)
-    # Включаем современный OpenMP для поддержки max и simd
     target_compile_options(Core PRIVATE 
         $<$<COMPILE_LANGUAGE:CXX>:/Zc:preprocessor>
         $<$<COMPILE_LANGUAGE:CXX>:-openmp:llvm>
@@ -95,12 +102,10 @@ if(MSVC)
     )
     
     if(CMAKE_CUDA_COMPILER)
-        # Убираем ворнинги GLM в CUDA и прокидываем препроцессор
         target_compile_options(Core PRIVATE 
             $<$<COMPILE_LANGUAGE:CUDA>:-Xcompiler=/Zc:preprocessor>
             $<$<COMPILE_LANGUAGE:CUDA>:--expt-relaxed-constexpr>
         )
-        
         target_compile_definitions(Core PRIVATE 
             $<$<COMPILE_LANGUAGE:CUDA>:CCCL_IGNORE_MSVC_TRADITIONAL_PREPROCESSOR_WARNING>
         )
@@ -108,7 +113,7 @@ if(MSVC)
 endif()
 
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -march=native -ffast-math")
+    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mtune=generic")
 endif()
 
 # ---------------------------------------------------------
@@ -126,32 +131,28 @@ target_link_libraries(DataCreator PRIVATE Core)
 # ---------------------------------------------------------
 # 5. Установка (INSTALL)
 # ---------------------------------------------------------
-
-# Устанавливаем EXE в bin/
 install(TARGETS Simulate Replay DataCreator
     RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
 )
-
-# Устанавливаем папку data/ в папку с исполняемыми файлами
 install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR})
 
 # ---------------------------------------------------------
 # 6. Windows DLL Deployment
 # ---------------------------------------------------------
 if(WIN32)
-    # Копирование DLL при установке (cmake --install)
     install(FILES $<TARGET_RUNTIME_DLLS:Simulate> DESTINATION ${CMAKE_INSTALL_BINDIR})
     
-    # Копирование папки data и DLL сразу после сборки (для запуска из папки build)
-    add_custom_command(TARGET Simulate POST_BUILD
-        COMMAND ${CMAKE_COMMAND} -E copy_directory
-            "${CMAKE_CURRENT_SOURCE_DIR}/data"
-            "$<TARGET_FILE_DIR:Simulate>/data"
-        COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:Simulate>"
-            $<TARGET_RUNTIME_DLLS:Simulate>
-        COMMENT "Copying data and DLLs to executable directory..."
-        COMMAND_EXPAND_LISTS
-    )
+    foreach(TARGET_NAME Simulate Replay DataCreator)
+        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+            COMMAND ${CMAKE_COMMAND} -E copy_directory
+                "${CMAKE_CURRENT_SOURCE_DIR}/data"
+                "$<TARGET_FILE_DIR:${TARGET_NAME}>/data"
+            COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>
+            COMMENT "Copying data and DLLs to ${TARGET_NAME} directory..."
+            COMMAND_EXPAND_LISTS
+        )
+    endforeach()
 endif()
 
 include(CPack)
