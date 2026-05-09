@@ -1,5 +1,6 @@
 #include "brut_force.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <cstddef>
 #include <vector>
@@ -13,18 +14,13 @@
 
 namespace {
 
-struct AccelStats {
-    double maxAcc = 0.0;
-    double minDist = std::numeric_limits<double>::max();
-};
-
+// O(N²) попарно с симметрией Ньютона. Параллелизуется через thread-local
+// буфера; финальная свёртка — Neumaier-компенсированная.
 void computeAccelerations(const std::vector<glm::dvec3>& positions,
                           const std::vector<double>& masses,
-                          std::vector<glm::dvec3>& accelerations,
-                          AccelStats* stats = nullptr) {
+                          std::vector<glm::dvec3>& accelerations) {
     const size_t n = positions.size();
     accelerations.assign(n, glm::dvec3(0.0));
-    double minDistLocal = std::numeric_limits<double>::max();
     const double soft = physics::getSofteningAU();
     const double soft2 = soft * soft;
 
@@ -55,28 +51,28 @@ void computeAccelerations(const std::vector<glm::dvec3>& positions,
                 const glm::dvec3 delta = positions[j] - positions[static_cast<size_t>(i)];
                 const double rawDistSq = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
                 const double distSq = rawDistSq + soft2;
-                if (rawDistSq > 0.0) {
-                    const double rawDist = std::sqrt(rawDistSq);
-                    if (rawDist < minDistLocal) minDistLocal = rawDist;
-                } else if (soft2 <= 0.0) {
-                    continue;
-                }
-                const double invDist = 1.0 / std::sqrt(distSq);
+                if (rawDistSq <= 0.0 && soft2 <= 0.0) continue;
+                const double invDist  = 1.0 / std::sqrt(distSq);
                 const double invDist3 = invDist * invDist * invDist;
-
-                const double common = physics::G * invDist3;
+                const double common   = physics::G * invDist3;
                 const glm::dvec3 ai = delta * (common * masses[j]);
                 const glm::dvec3 aj = delta * (common * masses[static_cast<size_t>(i)]);
-
                 acc[static_cast<size_t>(i)] += ai;
-                acc[j] -= aj;
+                acc[j]                       -= aj;
             }
         }
     }
 
+    static std::vector<glm::dvec3> comp;
+    if (comp.size() != n) comp.assign(n, glm::dvec3(0.0));
+    else                  std::fill(comp.begin(), comp.end(), glm::dvec3(0.0));
+
     for (const auto& accThread : localAcc) {
         for (size_t i = 0; i < n; ++i) {
-            accelerations[i] += accThread[i];
+            const glm::dvec3 y = accThread[i] - comp[i];
+            const glm::dvec3 t = accelerations[i] + y;
+            comp[i]         = (t - accelerations[i]) - y;
+            accelerations[i] = t;
         }
     }
 #else
@@ -85,133 +81,75 @@ void computeAccelerations(const std::vector<glm::dvec3>& positions,
             const glm::dvec3 delta = positions[j] - positions[i];
             const double rawDistSq = delta.x * delta.x + delta.y * delta.y + delta.z * delta.z;
             const double distSq = rawDistSq + soft2;
-            if (rawDistSq > 0.0) {
-                const double rawDist = std::sqrt(rawDistSq);
-                if (rawDist < minDistLocal) minDistLocal = rawDist;
-            } else if (soft2 <= 0.0) {
-                continue;
-            }
-            const double invDist = 1.0 / std::sqrt(distSq);
+            if (rawDistSq <= 0.0 && soft2 <= 0.0) continue;
+            const double invDist  = 1.0 / std::sqrt(distSq);
             const double invDist3 = invDist * invDist * invDist;
-
-            const double common = physics::G * invDist3;
+            const double common   = physics::G * invDist3;
             const glm::dvec3 ai = delta * (common * masses[j]);
             const glm::dvec3 aj = delta * (common * masses[i]);
-
             accelerations[i] += ai;
             accelerations[j] -= aj;
         }
     }
 #endif
-
-    if (stats != nullptr) {
-        double maxA = 0.0;
-        for (const auto& a : accelerations) {
-            maxA = std::max(maxA, glm::length(a));
-        }
-        stats->maxAcc = maxA;
-        stats->minDist = minDistLocal;
-    }
 }
 
 } // namespace
 
 void simulationStepBrutForceCPU(std::vector<Object>& objs, double dt, bool pause, bool forceSync) {
     (void)forceSync;
-    if (pause || objs.empty()) {
-        return;
-    }
-    if (dt <= 0.0) {
-        return;
-    }
+    if (pause || objs.empty()) return;
+    if (dt <= 0.0)              return;
 
     const size_t n = objs.size();
 
-    // Reused work buffers to minimize per-step allocations.
-    static std::vector<double> masses;
+    static std::vector<double>     masses;
     static std::vector<glm::dvec3> x, v;
-    static std::vector<glm::dvec3> k1x, k2x, k3x, k4x;
-    static std::vector<glm::dvec3> k1v, k2v, k3v, k4v;
-    static std::vector<glm::dvec3> tmpX, tmpV;
+    static std::vector<glm::dvec3> aCur, aNext, tmpX;
 
     masses.resize(n);
     x.resize(n);
     v.resize(n);
-    k1x.resize(n); k2x.resize(n); k3x.resize(n); k4x.resize(n);
-    k1v.resize(n); k2v.resize(n); k3v.resize(n); k4v.resize(n);
+    aCur.resize(n);
+    aNext.resize(n);
     tmpX.resize(n);
-    tmpV.resize(n);
 
     for (size_t i = 0; i < n; ++i) {
         masses[i] = objs[i].mass;
-        x[i] = objs[i].position;
-        v[i] = objs[i].velocity;
+        x[i]      = objs[i].position;
+        v[i]      = objs[i].velocity;
     }
 
-    double remaining = dt;
-    constexpr int MAX_SUBSTEPS = 1024;
-    int substeps = 0;
-    while (remaining > 0.0 && substeps < MAX_SUBSTEPS) {
-        AccelStats st;
-        computeAccelerations(x, masses, k1v, &st);
-        for (size_t i = 0; i < n; ++i) {
-            k1x[i] = v[i];
-        }
+    // Yoshida4 = три Velocity-Verlet с коэф. (w1, w0, w1); w0 < 0.
+    // Фиксированный шаг — обязательное условие симплектичности интегратора.
+    const double cbrt2 = std::cbrt(2.0);
+    const double w1    = 1.0 / (2.0 - cbrt2);
+    const double w0    = -cbrt2 * w1;
+    const double yoshidaCoeffs[3] = { w1, w0, w1 };
 
-        double suggested = remaining;
-        if (st.maxAcc > 0.0) {
-            suggested = std::min(suggested, 0.02 / std::sqrt(st.maxAcc));
-        }
-        if (st.minDist < std::numeric_limits<double>::max()) {
-            const double maxMass = *std::max_element(masses.begin(), masses.end());
-            const double dyn = 0.1 * std::sqrt((st.minDist * st.minDist * st.minDist) / std::max(physics::G * maxMass, 1e-30));
-            suggested = std::min(suggested, dyn);
-        }
-        const double minStep = dt / 4096.0;
-        double h = std::clamp(suggested, minStep, remaining);
+    computeAccelerations(x, masses, aCur);
 
+    auto verletSubstep = [&](double hs) {
+        const double half_hs = 0.5 * hs;
+        const double hs2     = hs * hs;
         for (size_t i = 0; i < n; ++i) {
-            tmpX[i] = x[i] + 0.5 * h * k1x[i];
-            tmpV[i] = v[i] + 0.5 * h * k1v[i];
+            tmpX[i] = x[i] + v[i] * hs + 0.5 * aCur[i] * hs2;
         }
-        computeAccelerations(tmpX, masses, k2v, nullptr);
+        computeAccelerations(tmpX, masses, aNext);
         for (size_t i = 0; i < n; ++i) {
-            k2x[i] = tmpV[i];
+            v[i]   += half_hs * (aCur[i] + aNext[i]);
+            x[i]    = tmpX[i];
+            aCur[i] = aNext[i]; // FSAL
         }
+    };
 
-        for (size_t i = 0; i < n; ++i) {
-            tmpX[i] = x[i] + 0.5 * h * k2x[i];
-            tmpV[i] = v[i] + 0.5 * h * k2v[i];
-        }
-        computeAccelerations(tmpX, masses, k3v, nullptr);
-        for (size_t i = 0; i < n; ++i) {
-            k3x[i] = tmpV[i];
-        }
-
-        for (size_t i = 0; i < n; ++i) {
-            tmpX[i] = x[i] + h * k3x[i];
-            tmpV[i] = v[i] + h * k3v[i];
-        }
-        computeAccelerations(tmpX, masses, k4v, nullptr);
-        for (size_t i = 0; i < n; ++i) {
-            k4x[i] = tmpV[i];
-        }
-
-        const double w = h / 6.0;
-        for (size_t i = 0; i < n; ++i) {
-            x[i] += w * (k1x[i] + 2.0 * k2x[i] + 2.0 * k3x[i] + k4x[i]);
-            v[i] += w * (k1v[i] + 2.0 * k2v[i] + 2.0 * k3v[i] + k4v[i]);
-        }
-
-        remaining -= h;
-        ++substeps;
+    for (int s = 0; s < 3; ++s) {
+        verletSubstep(yoshidaCoeffs[s] * dt);
     }
 
-    // Save state back to objects
-    computeAccelerations(x, masses, k1v, nullptr);
     for (size_t i = 0; i < n; ++i) {
-        objs[i].position = x[i];
-        objs[i].velocity = v[i];
-        objs[i].acceleration = k1v[i];
+        objs[i].position     = x[i];
+        objs[i].velocity     = v[i];
+        objs[i].acceleration = aCur[i];
     }
 }

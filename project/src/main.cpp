@@ -26,6 +26,7 @@
 #include "H5Cpp.h"
 #include <time.h>
 #include "brut_force.hpp"
+#include "whfast.hpp"
 #include "physics.hpp"
 #include "generators.hpp"
 #include "camera.hpp"
@@ -138,9 +139,10 @@ int main(int argc, char* argv[]) {
 #ifdef USE_CUDA
     if (!is_cli) {
         std::cout << "Выберите алгоритм:\n"
-                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [1] Брутфорс Yoshida4 (O(N^2))\n"
                   << "  [2] Барнс-Хат CPU\n"
                   << "  [3] Барнс-Хат GPU (CUDA)\n"
+                  << "  [4] WHFast (Solar-like, O(N^2) на kick + Kepler)\n"
                   << "Введите номер: " << std::flush;
         std::cin >> mode;
     } else {
@@ -149,8 +151,9 @@ int main(int argc, char* argv[]) {
 #else
     if (!is_cli) {
         std::cout << "Выберите алгоритм:\n"
-                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [1] Брутфорс Yoshida4 (O(N^2))\n"
                   << "  [2] Барнс-Хат CPU\n"
+                  << "  [4] WHFast (Solar-like, O(N^2) на kick + Kepler)\n"
                   << "Введите номер: " << std::flush;
         std::cin >> mode;
     } else {
@@ -164,6 +167,7 @@ int main(int argc, char* argv[]) {
 #ifdef USE_CUDA
         case 3: simulationStep = &simulationStepBarnesHutCUDA; break;
 #endif
+        case 4: simulationStep = &simulationStepWHFastCPU; break;
         default:
             std::cout << "Неверный выбор, используем брутфорс.\n";
             simulationStep = &simulationStepBrutForceCPU;
@@ -417,8 +421,9 @@ int main(int argc, char* argv[]) {
         std::cout << "Начинаем расчет (headless режим)..." << std::endl;
 
         while (state.running && gSimTime < targetTime && !g_Interrupt) {
-            simulationStep(objs, fixedDt, false, false);
-            gSimTime += fixedDt;
+            double stepDt = std::min(fixedDt, targetTime - gSimTime);
+            simulationStep(objs, stepDt, false, false);
+            gSimTime += stepDt;
             stepCounter += 1;
             
             if (stepCounter % (1 * 10) == 0) {
