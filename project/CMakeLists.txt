@@ -58,6 +58,7 @@ set(CORE_SRC
     src/generators.cpp
     algo/barnes_hut.cpp
     algo/brut_force.cpp
+    algo/whfast.cpp
     ${CUDA_SOURCES}
 ) 
 
