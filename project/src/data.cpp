@@ -191,6 +191,11 @@ bool LoadObjectsFromFile(const std::string& filePath,
     try {
         parts = Reader(filePath, dsetName, &hadColorMember);
     }
+    catch (const H5::Exception& e) {
+        std::cerr << "LoadObjectsFromFile: failed to read HDF5: "
+                  << e.getDetailMsg() << "\n";
+        return false;
+    }
     catch (const std::exception& e) {
         std::cerr << "LoadObjectsFromFile: failed to read HDF5: "
                   << e.what() << "\n";
