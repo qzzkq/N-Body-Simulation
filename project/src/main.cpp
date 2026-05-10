@@ -531,7 +531,7 @@ int main(int argc, char* argv[]) {
 
     simulationStep(objs, 0.0, true, true);
     const std::string finalTextPath = "data/" + filename + "_final.txt";
-    if (SaveSystemToTextFile(finalTextPath, objs)) {
+    if (SaveSystemToTextFile(finalTextPath, objs, &graphics)) {
         std::cout << "Финальное состояние сохранено в " << finalTextPath << "\n";
     } else {
         std::cout << "Не удалось сохранить финальное состояние в " << finalTextPath << "\n";
