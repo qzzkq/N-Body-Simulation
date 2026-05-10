@@ -112,6 +112,86 @@ def generate_m13(count: int, seed: int) -> list[Body]:
     return rows
 
 
+def _plummer_sample(rng: random.Random, count: int, M_total_kg: float, a_m: float):
+    G_SI = 6.674e-11
+    for _ in range(count):
+        u = rng.random()
+        r = a_m / math.sqrt(u ** (-2 / 3) - 1.0)
+        ct = rng.uniform(-1, 1)
+        st = math.sqrt(max(0.0, 1 - ct * ct))
+        phi = rng.uniform(0, 2 * math.pi)
+        x = r * st * math.cos(phi)
+        y = r * st * math.sin(phi)
+        z = r * ct
+
+        v_esc = math.sqrt(2.0 * G_SI * M_total_kg / math.sqrt(r * r + a_m * a_m))
+        while True:
+            q = rng.random()
+            g = q * q * (1 - q * q) ** 3.5
+            if 0.1 * rng.random() < g:
+                break
+        v = q * v_esc
+        ct2 = rng.uniform(-1, 1)
+        st2 = math.sqrt(max(0.0, 1 - ct2 * ct2))
+        psi = rng.uniform(0, 2 * math.pi)
+        vx = v * st2 * math.cos(psi)
+        vy = v * st2 * math.sin(psi)
+        vz = v * ct2
+        yield (x, y, z, vx, vy, vz)
+
+
+def generate_collision(count: int, seed: int,
+                       separation_au: float = 80000.0,
+                       impact_b_au: float  = 20000.0,
+                       v_approach_frac: float = 0.7,
+                       mass_each_solar: float = 6e5,
+                       scale_au: float = 8000.0) -> list[Body]:
+    """Две Plummer-галактики, летящие навстречу друг другу.
+
+    count          — общее число тел (делится поровну между галактиками).
+    separation_au  — начальное расстояние между центрами (по X).
+    impact_b_au    — прицельный параметр (смещение по Y, 0 = лоб-в-лоб).
+    v_approach_frac— скорость сближения как доля v_esc на текущем расстоянии.
+    mass_each_solar— масса каждой галактики [M☉].
+    scale_au       — масштабный радиус Plummer для каждой [AU].
+    """
+    rng = random.Random(seed)
+    half = count // 2
+    n_a, n_b = half, count - half
+
+    M_each_kg = mass_each_solar * SOLAR_MASS_KG
+    a_m       = scale_au * AU_METERS
+    sep_m     = separation_au * AU_METERS
+    b_m       = impact_b_au   * AU_METERS
+
+    G_SI = 6.674e-11
+    v_esc_pair = math.sqrt(2.0 * G_SI * (2.0 * M_each_kg) / sep_m)
+    v_bulk     = v_approach_frac * v_esc_pair * 0.5  # каждая галактика идёт с половиной относительной скорости
+
+    m_star_a = M_each_kg / n_a
+    m_star_b = M_each_kg / n_b
+    density  = 5000.0
+    rows: list[Body] = []
+
+    # Galaxy A: центр (-sep/2, +b/2, 0), летит в +X.
+    cx, cy, cvx = -0.5 * sep_m, +0.5 * b_m, +v_bulk
+    for i, (x, y, z, vx, vy, vz) in enumerate(_plummer_sample(rng, n_a, M_each_kg, a_m)):
+        rows.append(Body(f"A{i}", m_star_a, density,
+                         cx + x, cy + y, z,
+                         cvx + vx, vy, vz,
+                         0.6, 0.8, 1.0))
+
+    # Galaxy B: центр (+sep/2, -b/2, 0), летит в -X.
+    cx, cy, cvx = +0.5 * sep_m, -0.5 * b_m, -v_bulk
+    for i, (x, y, z, vx, vy, vz) in enumerate(_plummer_sample(rng, n_b, M_each_kg, a_m)):
+        rows.append(Body(f"B{i}", m_star_b, density,
+                         cx + x, cy + y, z,
+                         cvx + vx, vy, vz,
+                         1.0, 0.7, 0.5))
+
+    return rows
+
+
 def main() -> None:
     ap = argparse.ArgumentParser()
     sub = ap.add_subparsers(dest="mode", required=True)
@@ -130,6 +210,16 @@ def main() -> None:
     m.add_argument("--seed",  type=int, default=42)
     m.add_argument("--out",   default="data/m13.txt")
 
+    c = sub.add_parser("collision")
+    c.add_argument("--count",      type=int,   default=200000)
+    c.add_argument("--seed",       type=int,   default=42)
+    c.add_argument("--separation", type=float, default=80000.0,  help="distance between centers [AU]")
+    c.add_argument("--impact",     type=float, default=20000.0,  help="impact parameter [AU]")
+    c.add_argument("--v-frac",     type=float, default=0.7,      help="approach speed as fraction of mutual v_esc")
+    c.add_argument("--mass-each",  type=float, default=6e5,      help="mass of each galaxy [M☉]")
+    c.add_argument("--scale",      type=float, default=8000.0,   help="Plummer scale radius [AU]")
+    c.add_argument("--out",        default="data/collision.txt")
+
     args = ap.parse_args()
     out = Path(args.out)
     out.parent.mkdir(parents=True, exist_ok=True)
@@ -142,6 +232,15 @@ def main() -> None:
     elif args.mode == "m13":
         rows = generate_m13(args.count, args.seed)
         write(out, rows, header=f"M13 Plummer N={args.count} seed={args.seed}")
+    elif args.mode == "collision":
+        rows = generate_collision(args.count, args.seed,
+                                  separation_au=args.separation,
+                                  impact_b_au=args.impact,
+                                  v_approach_frac=args.v_frac,
+                                  mass_each_solar=args.mass_each,
+                                  scale_au=args.scale)
+        write(out, rows, header=(f"Galaxy collision N={args.count} sep={args.separation}AU "
+                                 f"b={args.impact}AU v={args.v_frac}·v_esc seed={args.seed}"))
     print(f"Written → {out}")
 
 if __name__ == "__main__":

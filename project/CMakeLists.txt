@@ -93,6 +93,11 @@ endif()
 if(CMAKE_CUDA_COMPILER)
     target_link_libraries(Core PUBLIC CUDA::cudart)
     set_property(TARGET Core PROPERTY CUDA_ARCHITECTURES "80;86;89")
+    # Fast-math для CUDA: rsqrtf/sqrtf/etc. — hardware-fast, без strict IEEE.
+    # Безопасно для нашего force-kernel (точность всё равно FP32 внутри FP64 акк.).
+    target_compile_options(Core PRIVATE
+        $<$<COMPILE_LANGUAGE:CUDA>:--use_fast_math>
+    )
 endif()
 
 if(MSVC)

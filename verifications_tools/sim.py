@@ -14,6 +14,8 @@ def run_cpp(
     algo: int = 1,
     save_interval_steps: int = 10,
     timeout: float | None = None,
+    bh_theta: float | None = None,
+    softening_au: float | None = None,
 ) -> Path:
     exe = Path(exe).resolve()
     cwd = exe.parent
@@ -28,6 +30,10 @@ def run_cpp(
         "--save_every", str(max(1, int(save_interval_steps))),
         "--target",   str(float(years)),
     ]
+    if bh_theta is not None:
+        cmd += ["--bh-theta", format(float(bh_theta), ".17g")]
+    if softening_au is not None:
+        cmd += ["--softening", format(float(softening_au), ".17g")]
 
     import sys
     proc = subprocess.Popen(cmd, cwd=str(cwd),

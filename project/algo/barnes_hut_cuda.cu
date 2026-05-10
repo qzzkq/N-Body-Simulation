@@ -17,7 +17,11 @@
 #include "physics.hpp"
 
 #define THREADS_PER_BLOCK 256
-#define MAX_STACK 64
+#define WARPS_PER_BLOCK (THREADS_PER_BLOCK / 32)
+#define WARP_STACK_DEPTH 128     // 21 уровень × 7 siblings ≈ 147 worst-case;
+                                 // в пракатике с Morton-локальностью warp'а
+                                 // глубина < 64. Overflow ловится через STATUS_TRAVERSAL_STACK_OVERFLOW.
+#define ALWAYS_DIRECT_FACTOR_SQ 9.0f  // открывать узел если r² < этого × softening²
 
 namespace {
 
@@ -27,9 +31,12 @@ constexpr int MORTON_BITS_PER_AXIS = 21;
 constexpr int TREE_DEPTH = MORTON_BITS_PER_AXIS;
 constexpr unsigned int MORTON_GRID_SIZE = 1u << 21; // 2097152
 constexpr int NODE_CAPACITY_FACTOR = 16;
-constexpr int MAX_FIXED_SUBSTEPS = 256;
-constexpr double MAX_FIXED_STEP = 1.0 / 1024.0;
-constexpr double G_CONST_D = physics::G;
+// Adaptive timestep:
+//   h = clamp(eta/sqrt(max|a|), dt/cap, remaining)
+// Параметры eta и cap берутся в runtime из physics::getAdaptiveEta() /
+// physics::getSubstepCap() — задаются через --adaptive-eta / --substep-cap
+// в CLI или интерактивный prompt «Качество». Дефолт = balanced пресет.
+constexpr float G_CONST_F = static_cast<float>(physics::G);
 constexpr int STATUS_BUILD_NODE_OVERFLOW = 1 << 0;
 constexpr int STATUS_TRAVERSAL_STACK_OVERFLOW = 1 << 1;
 
@@ -41,6 +48,17 @@ struct __align__(16) GpuNode {
     int children[8];
     int bodyBegin;
     int bodyCount;
+    // Traceless symmetric quadrupole (Qzz = -(Qxx+Qyy), хранится 5 компонент).
+    // Накапливается AtomicAdd'ом из листьев со Steiner-сдвигом до COM узла.
+    float Qxx;
+    float Qyy;
+    float Qxy;
+    float Qxz;
+    float Qyz;
+    // Dehnen-δ: максимум ||body - COM_node|| по всем телам в поддереве.
+    // MAC: открыть узел если (r - δ) ≤ size/θ. На листьях считается напрямую,
+    // на внутренних узлах накапливается atomicMax-ом сверху от листьев.
+    float delta;
 };
 
 static double4* d_posMass = nullptr;
@@ -63,6 +81,12 @@ static int* d_leafNodeIndices = nullptr;
 static int* d_leafCount = nullptr;
 static int* d_nodeCounter = nullptr;
 static int* d_statusFlags = nullptr;
+static double* d_maxAcc = nullptr;
+// Pinned host-side приёмник для maxAcc — убирает накладные расходы на pageable
+// memory при D→H transfer внутри substep-петли. Аллоцируется через cudaMallocHost.
+static double* h_maxAccPinned = nullptr;
+// Pinned host-side приёмник для status flags — аналогично, читается раз в outer-step.
+static int* h_statusFlagsPinned = nullptr;
 
 static size_t currentCapacity = 0;
 static bool deviceStateValid = false;
@@ -96,6 +120,30 @@ __device__ void atomicMaxDouble(double* addr, double value) {
     }
 }
 
+// Block-reduce |a| → atomicMax into outMax. Bit-trick atomicMax on unsigned long long
+// works for non-negative doubles since IEEE-754 ordering matches integer ordering.
+__global__ void maxAccelKernel(const double3* __restrict__ acc, int n, double* outMax) {
+    __shared__ double smax[THREADS_PER_BLOCK];
+    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    double v = 0.0;
+    if (idx < n) {
+        const double3 a = acc[idx];
+        v = sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+    }
+    smax[threadIdx.x] = v;
+    __syncthreads();
+    for (int stride = blockDim.x / 2; stride > 0; stride >>= 1) {
+        if (threadIdx.x < stride) {
+            smax[threadIdx.x] = fmax(smax[threadIdx.x], smax[threadIdx.x + stride]);
+        }
+        __syncthreads();
+    }
+    if (threadIdx.x == 0) {
+        atomicMax(reinterpret_cast<unsigned long long*>(outMax),
+                  static_cast<unsigned long long>(__double_as_longlong(smax[0])));
+    }
+}
+
 __device__ __forceinline__ void initNode(GpuNode* nodes, int idx, float3 cellCenter, float size) {
     nodes[idx].center = make_double3(0.0, 0.0, 0.0);
     nodes[idx].mass = 0.0;
@@ -103,6 +151,12 @@ __device__ __forceinline__ void initNode(GpuNode* nodes, int idx, float3 cellCen
     nodes[idx].size = size;
     nodes[idx].bodyBegin = -1;
     nodes[idx].bodyCount = 0;
+    nodes[idx].Qxx = 0.0f;
+    nodes[idx].Qyy = 0.0f;
+    nodes[idx].Qxy = 0.0f;
+    nodes[idx].Qxz = 0.0f;
+    nodes[idx].Qyz = 0.0f;
+    nodes[idx].delta = 0.0f;
     #pragma unroll
     for (int i = 0; i < 8; ++i) {
         nodes[idx].children[i] = -1;
@@ -149,7 +203,7 @@ __device__ __forceinline__ float3 cellCenterFromCode(unsigned int code, float3 r
     return center;
 }
 
-__global__ void resetBuildStateKernel(double* dMinMax, int* leafCount, int* nodeCounter, int* statusFlags) {
+__global__ void resetBuildStateKernel(double* dMinMax, int* leafCount, int* nodeCounter) {
     if (threadIdx.x == 0 && blockIdx.x == 0) {
         dMinMax[0] = 1e30;
         dMinMax[1] = -1e30;
@@ -159,7 +213,8 @@ __global__ void resetBuildStateKernel(double* dMinMax, int* leafCount, int* node
         dMinMax[5] = -1e30;
         *leafCount = 0;
         *nodeCounter = 1;
-        *statusFlags = 0;
+        // statusFlags НЕ обнуляем здесь — это делает host один раз на outer-step,
+        // а в buildTreeAndComputeAcceleration флаги атомарно ORятся между substep'ами.
     }
 }
 
@@ -420,6 +475,122 @@ __global__ void finalizeNodesKernel(GpuNode* nodes, const int* nodeCounter) {
     }
 }
 
+// Считает квадруполь листа (узла с bodyCount > 0) относительно COM этого листа.
+// Должен запускаться ПОСЛЕ finalizeNodesKernel — нужен корректный COM.
+__global__ void computeLeafQuadrupoleKernel(
+    GpuNode* __restrict__ nodes,
+    const double4* __restrict__ posMass,
+    const int* __restrict__ sortedBodyIndices,
+    const int* __restrict__ leafNodeIndices,
+    const int* __restrict__ leafCount) {
+    const int leafId = blockIdx.x * blockDim.x + threadIdx.x;
+    const int numLeaves = *leafCount;
+    if (leafId >= numLeaves) return;
+
+    const int nodeIdx = leafNodeIndices[leafId];
+    const double3 com  = nodes[nodeIdx].center;
+    const int begin = nodes[nodeIdx].bodyBegin;
+    const int end   = begin + nodes[nodeIdx].bodyCount;
+
+    double Qxx = 0.0, Qyy = 0.0, Qxy = 0.0, Qxz = 0.0, Qyz = 0.0;
+    double maxR2 = 0.0;
+    for (int i = begin; i < end; ++i) {
+        const int bodyIdx = sortedBodyIndices[i];
+        const double4 p = posMass[bodyIdx];
+        const double m = p.w;
+        const double dx = p.x - com.x;
+        const double dy = p.y - com.y;
+        const double dz = p.z - com.z;
+        const double d2 = dx*dx + dy*dy + dz*dz;
+        if (d2 > maxR2) maxR2 = d2;
+        Qxx += m * (3.0*dx*dx - d2);
+        Qyy += m * (3.0*dy*dy - d2);
+        Qxy += m * (3.0*dx*dy);
+        Qxz += m * (3.0*dx*dz);
+        Qyz += m * (3.0*dy*dz);
+    }
+    nodes[nodeIdx].Qxx = static_cast<float>(Qxx);
+    nodes[nodeIdx].Qyy = static_cast<float>(Qyy);
+    nodes[nodeIdx].Qxy = static_cast<float>(Qxy);
+    nodes[nodeIdx].Qxz = static_cast<float>(Qxz);
+    nodes[nodeIdx].Qyz = static_cast<float>(Qyz);
+    nodes[nodeIdx].delta = static_cast<float>(sqrt(maxR2));
+}
+
+// Накопление квадруполя вверх по дереву: каждый лист идёт от корня к себе
+// и atomicAdd'ом добавляет в каждый ancestor свой вклад со Steiner-сдвигом
+// (parallel-axis theorem для traceless квадруполя):
+//   Q_anc[ij] += Q_leaf[ij] + m_leaf · (3 d^i d^j - δ^ij |d|²),  d = COM_leaf - COM_anc.
+__global__ void accumulateQuadrupoleKernel(
+    GpuNode* __restrict__ nodes,
+    const morton_t* __restrict__ leafCodes,
+    const int* __restrict__ leafNodeIndices,
+    const int* __restrict__ leafCount) {
+    const int leafId = blockIdx.x * blockDim.x + threadIdx.x;
+    const int numLeaves = *leafCount;
+    if (leafId >= numLeaves) return;
+
+    const int leafNodeIdx = leafNodeIndices[leafId];
+    const double3 comL    = nodes[leafNodeIdx].center;
+    const double  mL      = nodes[leafNodeIdx].mass;
+    const float QLxx = nodes[leafNodeIdx].Qxx;
+    const float QLyy = nodes[leafNodeIdx].Qyy;
+    const float QLxy = nodes[leafNodeIdx].Qxy;
+    const float QLxz = nodes[leafNodeIdx].Qxz;
+    const float QLyz = nodes[leafNodeIdx].Qyz;
+    const float deltaL = nodes[leafNodeIdx].delta;
+
+    const morton_t code = leafCodes[leafId];
+
+    int current = 0;
+    for (int level = 1; level <= TREE_DEPTH; ++level) {
+        // Steiner shift до COM текущего ancestor'а.
+        const double3 comA = nodes[current].center;
+        const double dx = comL.x - comA.x;
+        const double dy = comL.y - comA.y;
+        const double dz = comL.z - comA.z;
+        const double d2 = dx*dx + dy*dy + dz*dz;
+        const float addXx = QLxx + static_cast<float>(mL * (3.0*dx*dx - d2));
+        const float addYy = QLyy + static_cast<float>(mL * (3.0*dy*dy - d2));
+        const float addXy = QLxy + static_cast<float>(mL * (3.0*dx*dy));
+        const float addXz = QLxz + static_cast<float>(mL * (3.0*dx*dz));
+        const float addYz = QLyz + static_cast<float>(mL * (3.0*dy*dz));
+        atomicAdd(&nodes[current].Qxx, addXx);
+        atomicAdd(&nodes[current].Qyy, addYy);
+        atomicAdd(&nodes[current].Qxy, addXy);
+        atomicAdd(&nodes[current].Qxz, addXz);
+        atomicAdd(&nodes[current].Qyz, addYz);
+
+        // Dehnen-δ: max ||body - COM_anc|| ≥ ||COM_leaf - COM_anc|| + δ_leaf.
+        // atomicMax на float через unsigned int — корректно для неотрицательных значений.
+        const float candidateDelta = static_cast<float>(sqrt(d2)) + deltaL;
+        atomicMax(reinterpret_cast<unsigned int*>(&nodes[current].delta),
+                  __float_as_uint(candidateDelta));
+
+        const int oct = octantFromCode(code, level);
+        const int next = nodes[current].children[oct];
+        if (next < 0 || next == leafNodeIdx) break;
+        current = next;
+    }
+}
+
+// Warp-collaborative traversal (Burtscher-Pingali 2011) с mixed precision.
+//
+// Архитектура:
+//   - 1 поток = 1 тело, как и раньше.
+//   - Стек вынесен в shared memory: один на варп (32 потока), не на поток.
+//   - Узел грузится единожды на варп — 32 потока читают одну ту же ячейку,
+//     hardware-coalescing превращает это в одну транзакцию.
+//   - Решение «принять monopole vs открыть»: __ballot_sync. Если хоть один
+//     поток в варпе хочет раскрыть узел — варп идёт в детей и НИКТО не
+//     накапливает на этом уровне (стандарт BP — стрикт-MAC по варпу).
+//
+// Точность:
+//   - FP64 вычитание дельт (cancellation-safe для координат до 10⁵ AU),
+//     далее FP32 + hardware rsqrtf, аккумулятор FP64.
+//   - Always-direct: узел никогда не аппроксимируется монополем при
+//     r² < ALWAYS_DIRECT_FACTOR_SQ · softening² — защита от резких ошибок
+//     в плотных сжатиях (типа коллизии ядер).
 __global__ void computeForcesKernel(
     const double4* __restrict__ posMass,
     const int* __restrict__ sortedBodyIndices,
@@ -429,83 +600,178 @@ __global__ void computeForcesKernel(
     int numBodies,
     float theta,
     double softeningSq) {
-    const int idx = blockIdx.x * blockDim.x + threadIdx.x;
-    if (idx >= numBodies) {
-        return;
+    __shared__ int sStack[WARPS_PER_BLOCK * WARP_STACK_DEPTH];
+    __shared__ int sStackTop[WARPS_PER_BLOCK];
+
+    const int tid     = threadIdx.x;
+    const int warpId  = tid >> 5;
+    const int laneId  = tid & 31;
+    const int sortPos = blockIdx.x * blockDim.x + tid;
+
+    int* myStack = &sStack[warpId * WARP_STACK_DEPTH];
+
+    // Идём в Morton-порядке: соседние lane'ы в варпе = соседние в пространстве.
+    // Это даёт высокий warp-consensus по MAC и резко снижает число открытий узла.
+    const bool active = (sortPos < numBodies);
+    int idx = -1;
+    double myPosX = 0.0, myPosY = 0.0, myPosZ = 0.0;
+    if (active) {
+        idx = sortedBodyIndices[sortPos];
+        const double4 self = posMass[idx];
+        myPosX = self.x;
+        myPosY = self.y;
+        myPosZ = self.z;
     }
 
-    const double4 self = posMass[idx];
-    const double3 myPos = make_double3(self.x, self.y, self.z);
+    const float thetaSq = theta * theta;
+    const float softSqF = static_cast<float>(softeningSq);
+    const float alwaysDirectR2 = softSqF * ALWAYS_DIRECT_FACTOR_SQ;
 
     double3 acc = make_double3(0.0, 0.0, 0.0);
-    int stack[MAX_STACK];
-    int stackTop = 1;
-    stack[0] = 0;
 
-    while (stackTop > 0) {
-        const GpuNode node = nodes[stack[--stackTop]];
+    if (laneId == 0) {
+        myStack[0] = 0;
+        sStackTop[warpId] = 1;
+    }
+    __syncwarp();
+
+    while (sStackTop[warpId] > 0) {
+        int nodeIdx = -1;
+        if (laneId == 0) {
+            nodeIdx = myStack[--sStackTop[warpId]];
+        }
+        nodeIdx = __shfl_sync(0xffffffff, nodeIdx, 0);
+
+        // Все 32 потока читают одну и ту же ячейку — hardware кэширует это
+        // как одну широковещательную транзакцию.
+        const GpuNode node = nodes[nodeIdx];
         if (node.mass <= 0.0) {
             continue;
         }
 
+        // Лист: warp-cooperative — лейны блоками по 32 совместно тянут
+        // данные «других» тел, потом каждый поток применяет силу к СВОЕМУ телу.
+        // ВАЖНО: все 32 лейна должны вызывать __shfl_sync, поэтому проверка
+        // `active` применяется только к НАКОПЛЕНИЮ, а не к самим shfl-операциям.
         if (node.bodyCount > 0) {
-            const int end = node.bodyBegin + node.bodyCount;
-            for (int i = node.bodyBegin; i < end; ++i) {
-                const int otherIdx = sortedBodyIndices[i];
-                if (otherIdx == idx) {
-                    continue;
+            const int begin = node.bodyBegin;
+            const int end   = begin + node.bodyCount;
+            for (int base = begin; base < end; base += 32) {
+                const int slot = base + laneId;
+                int otherIdx_l = -1;
+                double oXl = 0.0, oYl = 0.0, oZl = 0.0, oMl = 0.0;
+                if (slot < end) {
+                    otherIdx_l = sortedBodyIndices[slot];
+                    const double4 p = posMass[otherIdx_l];
+                    oXl = p.x; oYl = p.y; oZl = p.z; oMl = p.w;
                 }
-
-                const double4 other = posMass[otherIdx];
-                const double otherMass = other.w;
-                if (otherMass <= 0.0) {
-                    continue;
+                const int tile = min(32, end - base);
+                #pragma unroll 8
+                for (int t = 0; t < tile; ++t) {
+                    // Все 32 лейна участвуют в shfl независимо от `active`.
+                    const int    oIdx  = __shfl_sync(0xffffffff, otherIdx_l, t);
+                    const double oX    = __shfl_sync(0xffffffff, oXl, t);
+                    const double oY    = __shfl_sync(0xffffffff, oYl, t);
+                    const double oZ    = __shfl_sync(0xffffffff, oZl, t);
+                    const double oMass = __shfl_sync(0xffffffff, oMl, t);
+                    if (!active)            continue;
+                    if (oIdx == idx)        continue;
+                    if (oMass <= 0.0)       continue;
+                    const float dx = static_cast<float>(oX - myPosX);
+                    const float dy = static_cast<float>(oY - myPosY);
+                    const float dz = static_cast<float>(oZ - myPosZ);
+                    const float r2 = dx * dx + dy * dy + dz * dz + softSqF;
+                    const float invR  = rsqrtf(r2);
+                    const float invR3 = invR * invR * invR;
+                    const float scale = G_CONST_F * static_cast<float>(oMass) * invR3;
+                    acc.x += static_cast<double>(scale * dx);
+                    acc.y += static_cast<double>(scale * dy);
+                    acc.z += static_cast<double>(scale * dz);
                 }
-
-                const double dx = other.x - myPos.x;
-                const double dy = other.y - myPos.y;
-                const double dz = other.z - myPos.z;
-                const double distSq = dx * dx + dy * dy + dz * dz + softeningSq;
-                const double invDist = rsqrt(distSq);
-                const double invDist3 = invDist * invDist * invDist;
-                const double scale = G_CONST_D * otherMass * invDist3;
-
-                acc.x += scale * dx;
-                acc.y += scale * dy;
-                acc.z += scale * dz;
             }
             continue;
         }
 
-        const double dx = node.center.x - myPos.x;
-        const double dy = node.center.y - myPos.y;
-        const double dz = node.center.z - myPos.z;
-        const double distSq = dx * dx + dy * dy + dz * dz + softeningSq;
-        const double invDist = rsqrt(distSq);
+        float r2_thread = 1.0f;
+        float dxF = 0.0f, dyF = 0.0f, dzF = 0.0f;
+        bool acceptMe = true;
+        if (active) {
+            dxF = static_cast<float>(node.center.x - myPosX);
+            dyF = static_cast<float>(node.center.y - myPosY);
+            dzF = static_cast<float>(node.center.z - myPosZ);
+            r2_thread = dxF * dxF + dyF * dyF + dzF * dzF + softSqF;
+            const float sizeSq = node.size * node.size;
+            // Always-direct в зоне softening — никогда не аппроксимируем близкие узлы.
+            const bool nearField = (r2_thread < alwaysDirectR2);
+            // Dehnen MAC: s² < θ²·(r - δ)². Если r ≤ δ, тело может лежать внутри
+            // ball'а узла → принудительно открываем.
+            const float r_node = sqrtf(r2_thread);
+            const float effR   = r_node - node.delta;
+            acceptMe = (!nearField) && (effR > 0.0f) && (sizeSq < thetaSq * effR * effR);
+        }
+        // Неактивный поток (idx >= numBodies) голосует "accept", чтобы не
+        // заставлять варп бесполезно открывать узлы.
+        const unsigned int openMask = __ballot_sync(0xffffffff, !acceptMe);
 
-        if (static_cast<double>(node.size) * invDist < static_cast<double>(theta)) {
-            const double invDist3 = invDist * invDist * invDist;
-            const double scale = G_CONST_D * node.mass * invDist3;
-            acc.x += scale * dx;
-            acc.y += scale * dy;
-            acc.z += scale * dz;
+        if (openMask == 0u) {
+            if (active) {
+                const float invR  = rsqrtf(r2_thread);
+                const float invR2 = invR * invR;
+                const float invR3 = invR * invR2;
+                const float scale = G_CONST_F * static_cast<float>(node.mass) * invR3;
+
+                // Монополь: -GM/r³ · r̂  (в нашей конвенции d = source - body).
+                double ax = static_cast<double>(scale * dxF);
+                double ay = static_cast<double>(scale * dyF);
+                double az = static_cast<double>(scale * dzF);
+
+                // Квадрупольная поправка: a_q = (5G(d·Q·d)/2r⁷)·d - (G/r⁵)·Q·d
+                const float Qxx = node.Qxx;
+                const float Qyy = node.Qyy;
+                const float Qxy = node.Qxy;
+                const float Qxz = node.Qxz;
+                const float Qyz = node.Qyz;
+                const float Qzz = -(Qxx + Qyy);
+                const float Qdx = Qxx*dxF + Qxy*dyF + Qxz*dzF;
+                const float Qdy = Qxy*dxF + Qyy*dyF + Qyz*dzF;
+                const float Qdz = Qxz*dxF + Qyz*dyF + Qzz*dzF;
+                const float dQd = dxF*Qdx + dyF*Qdy + dzF*Qdz;
+                const float invR5 = invR3 * invR2;
+                const float invR7 = invR5 * invR2;
+                const float c5 = G_CONST_F * invR5;
+                const float c7 = 2.5f * G_CONST_F * invR7;
+                ax += static_cast<double>(c7 * dQd * dxF - c5 * Qdx);
+                ay += static_cast<double>(c7 * dQd * dyF - c5 * Qdy);
+                az += static_cast<double>(c7 * dQd * dzF - c5 * Qdz);
+
+                acc.x += ax;
+                acc.y += ay;
+                acc.z += az;
+            }
             continue;
         }
 
-        #pragma unroll
-        for (int child = 0; child < 8; ++child) {
-            const int next = node.children[child];
-            if (next >= 0) {
-                if (stackTop < MAX_STACK) {
-                    stack[stackTop++] = next;
-                } else {
-                    atomicOr(statusFlags, STATUS_TRAVERSAL_STACK_OVERFLOW);
+        if (laneId == 0) {
+            #pragma unroll
+            for (int child = 0; child < 8; ++child) {
+                const int next = node.children[child];
+                if (next >= 0) {
+                    const int top = sStackTop[warpId];
+                    if (top < WARP_STACK_DEPTH) {
+                        myStack[top] = next;
+                        sStackTop[warpId] = top + 1;
+                    } else {
+                        atomicOr(statusFlags, STATUS_TRAVERSAL_STACK_OVERFLOW);
+                    }
                 }
             }
         }
+        __syncwarp();
     }
 
-    outAcc[idx] = acc;
+    if (active) {
+        outAcc[idx] = acc;
+    }
 }
 
 __global__ void integratePositionKernel(
@@ -543,22 +809,13 @@ __global__ void updateVelocityKernel(
     acc[idx] = newAcc[idx];
 }
 
-int fixedSubstepCount(double dt) {
-    if (dt <= 0.0) {
-        return 0;
-    }
-
-    const int steps = static_cast<int>(std::ceil(dt / MAX_FIXED_STEP));
-    return std::max(1, std::min(MAX_FIXED_SUBSTEPS, steps));
-}
-
 void buildTreeAndComputeAcceleration(
     size_t numBodies,
     int blocks,
     float theta,
     double softeningSq,
     double3* outAcc) {
-    resetBuildStateKernel<<<1, 1>>>(d_minMax, d_leafCount, d_nodeCounter, d_statusFlags);
+    resetBuildStateKernel<<<1, 1>>>(d_minMax, d_leafCount, d_nodeCounter);
     CHECK_CUDA(cudaGetLastError());
 
     computeBoundingBoxKernel<<<blocks, THREADS_PER_BLOCK>>>(d_posMass, static_cast<int>(numBodies), d_minMax);
@@ -582,9 +839,9 @@ void buildTreeAndComputeAcceleration(
     thrust::device_ptr<int> leafIdBegin(d_leafIds);
     thrust::exclusive_scan(thrust::device, flagBegin, flagBegin + numBodies, leafIdBegin);
 
-    CHECK_CUDA(cudaMemset(d_leafStarts, 0xFF, currentCapacity * sizeof(int)));
-    CHECK_CUDA(cudaMemset(d_leafEnds, 0, currentCapacity * sizeof(int)));
-
+    // Memsets не нужны: buildLeafMetadataKernel пишет leafStarts/leafEnds только
+    // в позиции [0, leafCount), а initLeafNodesKernel читает их только в этом
+    // же диапазоне. Stale-данные за пределами никогда не используются.
     buildLeafMetadataKernel<<<blocks, THREADS_PER_BLOCK>>>(
         d_mortonCodes,
         d_leafFlags,
@@ -622,6 +879,16 @@ void buildTreeAndComputeAcceleration(
     finalizeNodesKernel<<<nodeBlocks, THREADS_PER_BLOCK>>>(d_nodes, d_nodeCounter);
     CHECK_CUDA(cudaGetLastError());
 
+    // Quadrupole pass: сначала Q каждого листа от его тел, затем накопление
+    // вверх по дереву через atomicAdd со Steiner-сдвигом.
+    computeLeafQuadrupoleKernel<<<blocks, THREADS_PER_BLOCK>>>(
+        d_nodes, d_posMass, d_sortedBodyIndices, d_leafNodeIndices, d_leafCount);
+    CHECK_CUDA(cudaGetLastError());
+
+    accumulateQuadrupoleKernel<<<blocks, THREADS_PER_BLOCK>>>(
+        d_nodes, d_leafCodes, d_leafNodeIndices, d_leafCount);
+    CHECK_CUDA(cudaGetLastError());
+
     computeForcesKernel<<<blocks, THREADS_PER_BLOCK>>>(
         d_posMass,
         d_sortedBodyIndices,
@@ -632,17 +899,8 @@ void buildTreeAndComputeAcceleration(
         theta,
         softeningSq);
     CHECK_CUDA(cudaGetLastError());
-
-    int statusFlags = 0;
-    CHECK_CUDA(cudaMemcpy(&statusFlags, d_statusFlags, sizeof(int), cudaMemcpyDeviceToHost));
-    if (statusFlags != 0) {
-        if ((statusFlags & STATUS_BUILD_NODE_OVERFLOW) != 0) {
-            throw std::runtime_error("Barnes-Hut CUDA tree capacity exhausted during build.");
-        }
-        if ((statusFlags & STATUS_TRAVERSAL_STACK_OVERFLOW) != 0) {
-            throw std::runtime_error("Barnes-Hut CUDA traversal stack overflowed.");
-        }
-    }
+    // statusFlags читаем не здесь, а один раз в simulationStep после всех substep'ов —
+    // это убирает D→H sync stall на каждом substep (см. фикс #2).
 }
 
 } // namespace
@@ -669,6 +927,9 @@ void InitBarnesHutCUDA(size_t maxObjects) {
     CHECK_CUDA(cudaMalloc(&d_leafCount, sizeof(int)));
     CHECK_CUDA(cudaMalloc(&d_nodeCounter, sizeof(int)));
     CHECK_CUDA(cudaMalloc(&d_statusFlags, sizeof(int)));
+    CHECK_CUDA(cudaMalloc(&d_maxAcc, sizeof(double)));
+    CHECK_CUDA(cudaMallocHost(&h_maxAccPinned, sizeof(double)));
+    CHECK_CUDA(cudaMallocHost(&h_statusFlagsPinned, sizeof(int)));
 
     deviceStateValid = false;
     accInitialized = false;
@@ -692,6 +953,9 @@ void CleanupBarnesHutCUDA() {
     if (d_leafCount) cudaFree(d_leafCount);
     if (d_nodeCounter) cudaFree(d_nodeCounter);
     if (d_statusFlags) cudaFree(d_statusFlags);
+    if (d_maxAcc) cudaFree(d_maxAcc);
+    if (h_maxAccPinned) cudaFreeHost(h_maxAccPinned);
+    if (h_statusFlagsPinned) cudaFreeHost(h_statusFlagsPinned);
 
     d_posMass = nullptr;
     d_vel = nullptr;
@@ -710,6 +974,9 @@ void CleanupBarnesHutCUDA() {
     d_leafCount = nullptr;
     d_nodeCounter = nullptr;
     d_statusFlags = nullptr;
+    d_maxAcc = nullptr;
+    h_maxAccPinned = nullptr;
+    h_statusFlagsPinned = nullptr;
 
     currentCapacity = 0;
     currentNodeCapacity = 0;
@@ -721,9 +988,10 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool paus
     if (objs.empty()) {
         return;
     }
-    if (pause && !forceSync) {
-        return;
-    }
+    // pause и forceSync — независимы: пауза значит "не интегрировать",
+    // forceSync значит "синхронизировать host↔device". Не выходим из функции
+    // на pause, иначе host не получит свежие данные с GPU когда renderer
+    // запрашивает (state.pause + forceSync=true в realtime).
 
     const size_t N = objs.size();
     if (N > currentCapacity) {
@@ -757,35 +1025,74 @@ void simulationStepBarnesHutCUDA(std::vector<Object>& objs, double dt, bool paus
     const double soft = physics::getSofteningAU();
     const double softSq = soft * soft;
 
-    if (dt > 0.0) {
+    if (dt > 0.0 && !pause) {
+        // Один сброс status-флагов на весь outer-step. Между substep'ами они
+        // атомарно ORятся; читаем после всего цикла.
+        CHECK_CUDA(cudaMemset(d_statusFlags, 0, sizeof(int)));
+
         if (!accInitialized) {
             buildTreeAndComputeAcceleration(N, blocks, theta, softSq, d_acc);
             accInitialized = true;
         }
 
-        const int substeps = fixedSubstepCount(dt);
-        const double h = dt / static_cast<double>(substeps);
+        // Adaptive substep с гарантированным завершением dt:
+        // minStep = dt/cap → даже в худшем случае (плотный кластер,
+        // η-формула просит h<<minStep) цикл завершится ровно за cap
+        // итераций и пройдёт ровно dt — никакого drift'а симуляционного времени.
+        const int    substepCap = std::max(1, physics::getSubstepCap());
+        const double adaptiveEta = physics::getAdaptiveEta();
+        const double minStep = dt / static_cast<double>(substepCap);
+        double remaining = dt;
+        int substeps = 0;
+        while (remaining > 0.0 && substeps < substepCap) {
+            // d_maxAcc сбрасываем через async-memset (без host stall), maxAccelKernel
+            // ORит результат, читаем в pinned-память — это убирает overhead от
+            // pageable-memory transfer.
+            CHECK_CUDA(cudaMemsetAsync(d_maxAcc, 0, sizeof(double)));
+            maxAccelKernel<<<blocks, THREADS_PER_BLOCK>>>(d_acc, static_cast<int>(N), d_maxAcc);
+            CHECK_CUDA(cudaGetLastError());
+            CHECK_CUDA(cudaMemcpy(h_maxAccPinned, d_maxAcc, sizeof(double), cudaMemcpyDeviceToHost));
+            const double maxAcc = *h_maxAccPinned;
 
-        for (int step = 0; step < substeps; ++step) {
+            double suggested = remaining;
+            if (maxAcc > 0.0) {
+                suggested = std::min(suggested, adaptiveEta / std::sqrt(maxAcc));
+            }
+            const double h = std::clamp(suggested, std::min(minStep, remaining), remaining);
+
             integratePositionKernel<<<blocks, THREADS_PER_BLOCK>>>(d_posMass, d_vel, d_acc, static_cast<int>(N), h);
             CHECK_CUDA(cudaGetLastError());
 
             buildTreeAndComputeAcceleration(N, blocks, theta, softSq, d_newAcc);
             updateVelocityKernel<<<blocks, THREADS_PER_BLOCK>>>(d_vel, d_acc, d_newAcc, static_cast<int>(N), h);
             CHECK_CUDA(cudaGetLastError());
+
+            remaining -= h;
+            ++substeps;
+        }
+
+        CHECK_CUDA(cudaMemcpy(h_statusFlagsPinned, d_statusFlags, sizeof(int), cudaMemcpyDeviceToHost));
+        const int statusFlags = *h_statusFlagsPinned;
+        if (statusFlags != 0) {
+            if ((statusFlags & STATUS_BUILD_NODE_OVERFLOW) != 0) {
+                throw std::runtime_error("Barnes-Hut CUDA tree capacity exhausted during build.");
+            }
+            if ((statusFlags & STATUS_TRAVERSAL_STACK_OVERFLOW) != 0) {
+                throw std::runtime_error("Barnes-Hut CUDA traversal stack overflowed.");
+            }
         }
     }
 
-    CHECK_CUDA(cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost));
-    for (size_t i = 0; i < N; ++i) {
-        objs[i].position = glm::dvec3(h_posMass[i].x, h_posMass[i].y, h_posMass[i].z);
-    }
-
+    // Хост-копию делаем только когда вызывающий явно просит — это либо кадр
+    // на сохранение (headless), либо рендер (realtime), либо финальный cleanup.
+    // На промежуточных headless-шагах без сохранения это 800+ KB D→H впустую.
     if (forceSync) {
+        CHECK_CUDA(cudaMemcpy(h_posMass.data(), d_posMass, N * sizeof(double4), cudaMemcpyDeviceToHost));
         CHECK_CUDA(cudaMemcpy(h_vel.data(), d_vel, N * sizeof(double3), cudaMemcpyDeviceToHost));
         CHECK_CUDA(cudaMemcpy(h_acc.data(), d_acc, N * sizeof(double3), cudaMemcpyDeviceToHost));
         for (size_t i = 0; i < N; ++i) {
-            objs[i].velocity = glm::dvec3(h_vel[i].x, h_vel[i].y, h_vel[i].z);
+            objs[i].position     = glm::dvec3(h_posMass[i].x, h_posMass[i].y, h_posMass[i].z);
+            objs[i].velocity     = glm::dvec3(h_vel[i].x, h_vel[i].y, h_vel[i].z);
             objs[i].acceleration = glm::dvec3(h_acc[i].x, h_acc[i].y, h_acc[i].z);
         }
     }

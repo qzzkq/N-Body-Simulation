@@ -22,7 +22,9 @@ CXXFLAGS  := $(OPT_FLAGS) -std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) $(DEPFLAGS)
 LIBS      := $(PKG_LIBS) -lGL -fopenmp
 
 ifeq ($(USE_CUDA),1)
-    NVCCFLAGS := -O3 $(CUDA_ARCH) --std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) -MD
+    NVCCFLAGS := -O3 $(CUDA_ARCH) --std=c++17 -I$(INC_DIR) -I$(ALGO_DIR) -MD \
+                 --use_fast_math -Xptxas -O3,-dlcm=ca --maxrregcount=64 \
+                 -Xcompiler "-O3 -march=native -ffast-math -fopenmp"
     CXXFLAGS += -DUSE_CUDA
     LIBS     += -lcudart
 

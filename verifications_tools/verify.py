@@ -99,9 +99,43 @@ def _benchmark(exe, input_txt, years, algo, save_n, com_align, out_dir):
     return {"case": "benchmark", "results": results}
 
 
+def _bh_vs_direct(exe, input_txt, years, dt, save_n, com_align,
+                  theta, softening, plot_dir, log_path):
+    """Сравнивает финальный снапшот brute-force (--algo 1) и BH-CUDA (--algo 3)
+    на одной системе. Эталон — brute-force; BH должен совпадать с заданной точностью."""
+    out_bf = f"bf_t{years}_dt{dt}"
+    out_bh = f"bh_t{years}_dt{dt}_th{theta}"
+
+    t0 = time.time()
+    bf_final = run_cpp(exe, input_txt, out_bf, dt, years,
+                       algo=1, save_interval_steps=save_n,
+                       softening_au=softening)
+    bf_t = time.time() - t0
+
+    t0 = time.time()
+    bh_final = run_cpp(exe, input_txt, out_bh, dt, years,
+                       algo=3, save_interval_steps=save_n,
+                       bh_theta=theta, softening_au=softening)
+    bh_t = time.time() - t0
+
+    m = compare(bh_final, bf_final, com_align=com_align)
+
+    if log_path:
+        write_log(m, Path(log_path))
+    if plot_dir and m.get("per_body"):
+        plot_per_body(m, Path(plot_dir) / "bh_vs_direct.png")
+
+    return {"case": "bh-vs-direct",
+            "theta": theta, "softening": softening,
+            "bf_seconds": bf_t, "bh_seconds": bh_t,
+            "speedup": bf_t / bh_t if bh_t > 0 else None,
+            "bf_final": str(bf_final), "bh_final": str(bh_final),
+            "metrics": m}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(formatter_class=argparse.ArgumentDefaultsHelpFormatter)
-    ap.add_argument("mode", choices=["solar", "large", "benchmark"])
+    ap.add_argument("mode", choices=["solar", "large", "benchmark", "bh-vs-direct"])
     ap.add_argument("--exe",     required=True, help="Path to Simulate binary")
     ap.add_argument("--input",   default="data/solar_nasa.txt")
     ap.add_argument("--years",   type=float, default=10.0)
@@ -114,6 +148,8 @@ def main() -> None:
     ap.add_argument("--count",       type=int, default=100000)
     ap.add_argument("--sample-size", type=int, default=3000, dest="sample_size")
     ap.add_argument("--seed",        type=int, default=42)
+    ap.add_argument("--theta",     type=float, default=0.5,  help="Barnes-Hut θ для bh-vs-direct")
+    ap.add_argument("--softening", type=float, default=0.0,  help="Softening AU (override default)")
     ap.add_argument("--report",   default="data/report.json")
     ap.add_argument("--log",      default="",  help="Per-body metrics text log path")
     ap.add_argument("--plot-dir", default="",  dest="plot_dir")
@@ -129,6 +165,11 @@ def main() -> None:
         result = _large(exe, args.years, args.dt, args.count, args.sample_size,
                         args.seed, args.algo, args.preset, args.save_n,
                         args.com_align, args.plot_dir or None, args.log or None)
+    elif args.mode == "bh-vs-direct":
+        result = _bh_vs_direct(exe, Path(args.input), args.years, args.dt,
+                               args.save_n, args.com_align,
+                               args.theta, args.softening if args.softening > 0 else None,
+                               args.plot_dir or None, args.log or None)
     else:
         result = _benchmark(exe, Path(args.input), args.years, args.algo,
                             args.save_n, args.com_align, args.plot_dir or "data")
