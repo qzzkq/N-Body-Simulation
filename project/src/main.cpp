@@ -14,8 +14,10 @@
 #include <array>
 #include <string>
 #include <cstring>
-#include <chrono> // Добавлено для замера времени без GLFW
-#include <memory> // Добавлено для std::unique_ptr
+// Добавлено для замера времени без GLFW
+#include <chrono>
+// Добавлено для std::unique_ptr
+#include <memory>
 #include "object.hpp"
 #include "graphic_state.hpp"
 #include "renderer.hpp"
@@ -26,6 +28,7 @@
 #include "H5Cpp.h"
 #include <time.h>
 #include "brut_force.hpp"
+#include "whfast.hpp"
 #include "physics.hpp"
 #include "generators.hpp"
 #include "camera.hpp"
@@ -61,7 +64,8 @@ bool cmdOptionExists(int argc, char* argv[], const std::string& option) {
 }
 
 double gSimTime = 0.0;
-double fixedDt = 1.0 / 3652.5; // шаг времени;
+// шаг времени
+double fixedDt = 1.0 / 3652.5;
 float initMass = 5.0f * std::pow(10.0f, 20.0f) / 5.0f;
 char title[128];
 
@@ -93,6 +97,67 @@ int main(int argc, char* argv[]) {
     } else {
         isRealTime = (getCmdOption(argc, argv, "--realtime", "1") == "1");
     }
+
+    // --- Качество (скорость vs точность) ---
+    // Сначала пресет (если задан), потом индивидуальные оверрайды.
+    if (!is_cli) {
+        std::cout << "Качество расчёта:\n"
+                  << "  [1] Быстро (viz, ×3-5 быстрее, заметный энергодрейф)\n"
+                  << "  [2] Сбалансированно (по умолчанию)\n"
+                  << "  [3] Точно (медленно, минимальная погрешность)\n"
+                  << "Ваш выбор: " << std::flush;
+        int q = 2;
+        std::cin >> q;
+        physics::applyQualityPreset(std::clamp(q, 1, 3) - 1);
+    } else {
+        const std::string qStr = getCmdOption(argc, argv, "--quality", "");
+        if (!qStr.empty()) {
+            int mode = 1; // balanced
+            if      (qStr == "fast"     || qStr == "1") mode = 0;
+            else if (qStr == "balanced" || qStr == "2") mode = 1;
+            else if (qStr == "precise"  || qStr == "3") mode = 2;
+            else {
+                std::cerr << "Неверное значение --quality (допустимо fast/balanced/precise), используем balanced\n";
+            }
+            physics::applyQualityPreset(mode);
+        }
+        const std::string thetaStr = getCmdOption(argc, argv, "--bh-theta", "");
+        if (!thetaStr.empty()) {
+            try {
+                physics::setBarnesHutTheta(std::stod(thetaStr));
+            } catch (...) {
+                std::cerr << "Неверное значение --bh-theta, используем по умолчанию\n";
+            }
+        }
+        const std::string softStr = getCmdOption(argc, argv, "--softening", "");
+        if (!softStr.empty()) {
+            try {
+                physics::setSofteningAU(std::stod(softStr));
+            } catch (...) {
+                std::cerr << "Неверное значение --softening, используем по умолчанию\n";
+            }
+        }
+        const std::string etaStr = getCmdOption(argc, argv, "--adaptive-eta", "");
+        if (!etaStr.empty()) {
+            try {
+                physics::setAdaptiveEta(std::stod(etaStr));
+            } catch (...) {
+                std::cerr << "Неверное значение --adaptive-eta, используем по умолчанию\n";
+            }
+        }
+        const std::string capStr = getCmdOption(argc, argv, "--substep-cap", "");
+        if (!capStr.empty()) {
+            try {
+                physics::setSubstepCap(std::stoi(capStr));
+            } catch (...) {
+                std::cerr << "Неверное значение --substep-cap, используем по умолчанию\n";
+            }
+        }
+    }
+    std::cout << "Параметры: theta=" << physics::getBarnesHutTheta()
+              << ", softening=" << physics::getSofteningAU()
+              << ", eta=" << physics::getAdaptiveEta()
+              << ", cap=" << physics::getSubstepCap() << "\n";
 
     Renderer renderer; 
     std::unique_ptr<Control> control = nullptr;
@@ -138,9 +203,10 @@ int main(int argc, char* argv[]) {
 #ifdef USE_CUDA
     if (!is_cli) {
         std::cout << "Выберите алгоритм:\n"
-                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [1] Брутфорс Yoshida4 (O(N^2))\n"
                   << "  [2] Барнс-Хат CPU\n"
                   << "  [3] Барнс-Хат GPU (CUDA)\n"
+                  << "  [4] WHFast (Solar-like, O(N^2) на kick + Kepler)\n"
                   << "Введите номер: " << std::flush;
         std::cin >> mode;
     } else {
@@ -149,8 +215,9 @@ int main(int argc, char* argv[]) {
 #else
     if (!is_cli) {
         std::cout << "Выберите алгоритм:\n"
-                  << "  [1] Брутфорс (O(N^2))\n"
+                  << "  [1] Брутфорс Yoshida4 (O(N^2))\n"
                   << "  [2] Барнс-Хат CPU\n"
+                  << "  [4] WHFast (Solar-like, O(N^2) на kick + Kepler)\n"
                   << "Введите номер: " << std::flush;
         std::cin >> mode;
     } else {
@@ -164,6 +231,7 @@ int main(int argc, char* argv[]) {
 #ifdef USE_CUDA
         case 3: simulationStep = &simulationStepBarnesHutCUDA; break;
 #endif
+        case 4: simulationStep = &simulationStepWHFastCPU; break;
         default:
             std::cout << "Неверный выбор, используем брутфорс.\n";
             simulationStep = &simulationStepBrutForceCPU;
@@ -361,7 +429,9 @@ int main(int argc, char* argv[]) {
             int substeps = 0;
             constexpr int MAX_SUBSTEPS = 100000;
             while (accumulator >= fixedDt && substeps < MAX_SUBSTEPS && !g_Interrupt) {
-                simulationStep(objs, fixedDt, state.pause, false);
+                // realtime: после каждого шага рендер читает objs[].position →
+                // нужен host-sync.
+                simulationStep(objs, fixedDt, state.pause, true);
                 gSimTime += fixedDt;
                 accumulator -= fixedDt;
                 ++substeps;
@@ -417,8 +487,12 @@ int main(int argc, char* argv[]) {
         std::cout << "Начинаем расчет (headless режим)..." << std::endl;
 
         while (state.running && gSimTime < targetTime && !g_Interrupt) {
-            simulationStep(objs, fixedDt, false, false);
-            gSimTime += fixedDt;
+            double stepDt = std::min(fixedDt, targetTime - gSimTime);
+            // headless: host-sync только когда кадр будет сохранён.
+            // Это убирает D→H копию (pos+vel+acc, ~5 МБ) на каждом не-save шаге.
+            const bool willSave = (((stepCounter + 1) % saveIntervalSteps) == 0);
+            simulationStep(objs, stepDt, false, willSave);
+            gSimTime += stepDt;
             stepCounter += 1;
             
             if (stepCounter % (1 * 10) == 0) {
@@ -457,7 +531,7 @@ int main(int argc, char* argv[]) {
 
     simulationStep(objs, 0.0, true, true);
     const std::string finalTextPath = "data/" + filename + "_final.txt";
-    if (SaveSystemToTextFile(finalTextPath, objs)) {
+    if (SaveSystemToTextFile(finalTextPath, objs, &graphics)) {
         std::cout << "Финальное состояние сохранено в " << finalTextPath << "\n";
     } else {
         std::cout << "Не удалось сохранить финальное состояние в " << finalTextPath << "\n";

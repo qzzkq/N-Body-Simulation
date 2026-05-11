@@ -124,6 +124,72 @@ public:
     }
 };
 
+// Шаровое скопление по модели Plummer (заготовка для M13).
+// Total mass и масштабный радиус берутся из GenParams: centralMass = M_total [M☉],
+// maxRadius = Plummer scale a [AU]; при нулях используются значения для M13.
+class M13PlummerScenario : public IScenario {
+public:
+    std::string getName() const override {
+        return "M13 (Plummer-скопление)";
+    }
+
+    void generate(std::vector<Object>& out, const GenParams& p) override {
+        out.clear();
+        if (p.count <= 0) return;
+        out.reserve(static_cast<size_t>(p.count));
+
+        const double M_total_solar = (p.centralMass > 0.0) ? p.centralMass : 6.0e5;
+        const double a_au          = (p.maxRadius   > 0.0) ? static_cast<double>(p.maxRadius) : 8000.0;
+        const double m_star        = M_total_solar / static_cast<double>(p.count);
+        const double GM            = physics::G * M_total_solar;
+        const double a2            = a_au * a_au;
+
+        std::mt19937 rng(p.seed);
+        std::uniform_real_distribution<double> u01(0.0, 1.0);
+        std::uniform_real_distribution<double> uMinus1_1(-1.0, 1.0);
+        std::uniform_real_distribution<double> uAngle(0.0, 2.0 * 3.14159265358979323846);
+
+        for (int i = 0; i < p.count; ++i) {
+            // Plummer CDF: r = a / sqrt(u^{-2/3} - 1).
+            double u = u01(rng);
+            if (u < 1e-12) u = 1e-12;
+            const double r = a_au / std::sqrt(std::pow(u, -2.0 / 3.0) - 1.0);
+
+            const double ct = uMinus1_1(rng);
+            const double st = std::sqrt(std::max(0.0, 1.0 - ct * ct));
+            const double phi = uAngle(rng);
+            const double x = r * st * std::cos(phi);
+            const double y = r * st * std::sin(phi);
+            const double z = r * ct;
+
+            // Aarseth-Henon-Wielen 1974: rejection sampling по q = v / v_esc.
+            const double v_esc = std::sqrt(2.0 * GM / std::sqrt(r * r + a2));
+            double q;
+            while (true) {
+                q = u01(rng);
+                const double g = q * q * std::pow(1.0 - q * q, 3.5);
+                if (0.1 * u01(rng) < g) break;
+            }
+            const double v = q * v_esc;
+
+            const double ct2 = uMinus1_1(rng);
+            const double st2 = std::sqrt(std::max(0.0, 1.0 - ct2 * ct2));
+            const double psi = uAngle(rng);
+            const double vx = v * st2 * std::cos(psi);
+            const double vy = v * st2 * std::sin(psi);
+            const double vz = v * ct2;
+
+            Object o(glm::dvec3(x, y, z), glm::dvec3(vx, vy, vz),
+                     m_star, 5000.0, std::nullopt);
+            o.Initalizing = false;
+            o.radius = CalcRadiusAU(o.mass);
+            out.push_back(std::move(o));
+        }
+
+        physics::colorFromMass(out);
+    }
+};
+
 void ScenarioManager::registerScenario(std::unique_ptr<IScenario> scenario) {
     scenarios_.push_back(std::move(scenario));
 }
@@ -153,5 +219,6 @@ std::unique_ptr<ScenarioManager> CreateDefaultManager() {
     auto mgr = std::make_unique<ScenarioManager>();
     mgr->registerScenario(std::make_unique<RingScenario>());
     mgr->registerScenario(std::make_unique<ClusterScenario>());
+    mgr->registerScenario(std::make_unique<M13PlummerScenario>());
     return mgr;
 }

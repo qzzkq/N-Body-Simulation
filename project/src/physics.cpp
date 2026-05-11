@@ -2,8 +2,10 @@
 
 namespace physics {
 
-static double gSofteningAU = DEFAULT_SOFTENING_AU;
+static double gSofteningAU    = DEFAULT_SOFTENING_AU;
 static double gBarnesHutTheta = DEFAULT_BARNES_HUT_THETA;
+static double gAdaptiveEta    = DEFAULT_ADAPTIVE_ETA;
+static int    gSubstepCap     = DEFAULT_SUBSTEP_CAP;
 
 double getSofteningAU() {
     return gSofteningAU;
@@ -19,6 +21,46 @@ double getBarnesHutTheta() {
 
 void setBarnesHutTheta(double theta) {
     gBarnesHutTheta = std::max(0.0, theta);
+}
+
+double getAdaptiveEta() {
+    return gAdaptiveEta;
+}
+
+void setAdaptiveEta(double eta) {
+    gAdaptiveEta = std::max(1e-4, eta);
+}
+
+int getSubstepCap() {
+    return gSubstepCap;
+}
+
+void setSubstepCap(int cap) {
+    gSubstepCap = std::max(1, cap);
+}
+
+void applyQualityPreset(int mode) {
+    switch (mode) {
+        case 0: // fast
+            setBarnesHutTheta(0.9);
+            setSofteningAU(0.05);
+            setAdaptiveEta(0.3);
+            setSubstepCap(32);
+            break;
+        case 2: // precise
+            setBarnesHutTheta(0.5);
+            setSofteningAU(1e-3);
+            setAdaptiveEta(0.05);
+            setSubstepCap(512);
+            break;
+        case 1: // balanced
+        default:
+            setBarnesHutTheta(0.6);
+            setSofteningAU(1e-2);
+            setAdaptiveEta(0.1);
+            setSubstepCap(128);
+            break;
+    }
 }
 
 double calculateTotalEnergy(const std::vector<Object>& objs) {

@@ -177,7 +177,8 @@ bool LoadSystemFromTextFile(const std::string& filePath,
  * @return @c true при успехе.
  */
 bool SaveSystemToTextFile(const std::string& filePath,
-                          const std::vector<Object>& objs);
+                          const std::vector<Object>& objs,
+                          const std::vector<GraphicState>* graphics = nullptr);
 
 #endif // DATA_HPP
 

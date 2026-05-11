@@ -53,8 +53,10 @@ namespace physics {
      */
     constexpr double G = 4.0 * PI * PI;
 
-    constexpr double DEFAULT_SOFTENING_AU       = 0.0; ///< Параметр сглаживания гравитации по умолчанию [AU]. 0 = жёсткая физика.
-    constexpr double DEFAULT_BARNES_HUT_THETA   = 0.5; ///< Параметр точности Barnes-Hut θ по умолчанию. Меньше → точнее, но медленнее.
+    constexpr double DEFAULT_SOFTENING_AU       = 1e-2; ///< Параметр сглаживания [AU]. Сбалансированный дефолт. Через CLI: --softening.
+    constexpr double DEFAULT_BARNES_HUT_THETA   = 0.6; ///< Barnes-Hut θ. Сбалансированный дефолт. Через CLI: --bh-theta.
+    constexpr double DEFAULT_ADAPTIVE_ETA       = 0.1; ///< η для adaptive substep: h = η/√max|a|. Меньше → точнее, медленнее. Через CLI: --adaptive-eta.
+    constexpr int    DEFAULT_SUBSTEP_CAP        = 128; ///< Макс. substep'ов на outer dt. Меньше → быстрее, грубее. Через CLI: --substep-cap.
     constexpr double RADIUS_SCALE               = 1.0; ///< Масштабный коэффициент радиуса при расчёте из плотности.
 
     /**
@@ -123,6 +125,29 @@ namespace physics {
      * @param theta Новое значение θ. Рекомендуемый диапазон: [0.3, 1.0].
      */
     void setBarnesHutTheta(double theta);
+
+    /**
+     * @brief η для адаптивного substep в BH-CUDA: h = η / √(max|a|).
+     * Меньше → точнее, больше substep'ов. Больше → быстрее, заметный энергодрейф.
+     * Производственный диапазон: 0.02–0.2.
+     */
+    double getAdaptiveEta();
+    void   setAdaptiveEta(double eta);
+
+    /**
+     * @brief Жёсткий потолок числа substep'ов на один outer dt.
+     * При cap'е minStep = dt/cap → симуляция всё равно проходит ровно dt,
+     * но с менее точным шагом. Меньше → быстрее.
+     */
+    int  getSubstepCap();
+    void setSubstepCap(int cap);
+
+    /**
+     * @brief Применить пресет «качество vs скорость» — устанавливает theta,
+     * softening, eta и substepCap одним вызовом.
+     * @param mode 0 = fast, 1 = balanced, 2 = precise.
+     */
+    void applyQualityPreset(int mode);
 
     /**
      * @brief Назначает цвета телам по логарифму их массы (устаревший API).

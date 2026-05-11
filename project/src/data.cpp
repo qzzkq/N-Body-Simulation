@@ -191,6 +191,11 @@ bool LoadObjectsFromFile(const std::string& filePath,
     try {
         parts = Reader(filePath, dsetName, &hadColorMember);
     }
+    catch (const H5::Exception& e) {
+        std::cerr << "LoadObjectsFromFile: failed to read HDF5: "
+                  << e.getDetailMsg() << "\n";
+        return false;
+    }
     catch (const std::exception& e) {
         std::cerr << "LoadObjectsFromFile: failed to read HDF5: "
                   << e.what() << "\n";
@@ -344,7 +349,8 @@ bool LoadSystemFromTextFile(const std::string& filePath,
 }
 
 bool SaveSystemToTextFile(const std::string& filePath,
-                          const std::vector<Object>& objs)
+                          const std::vector<Object>& objs,
+                          const std::vector<GraphicState>* graphics)
 {
     std::ofstream out(filePath);
     if (!out.is_open()) {
@@ -366,16 +372,16 @@ bool SaveSystemToTextFile(const std::string& filePath,
         const glm::dvec3 posM = obj.position / physics::METERS_TO_AU;
         const glm::dvec3 velMs = obj.velocity / physics::VELOCITY_TO_AU_PER_YEAR;
 
-        const int r = 255;
-        const int g = 255;
-        const int b = 255;
+        glm::vec4 col(1.0f);
+        if (graphics && i < graphics->size())
+            col = (*graphics)[i].color;
 
         out << name << ' '
             << massKg << ' '
             << obj.density << ' '
             << posM.x << ' ' << posM.y << ' ' << posM.z << ' '
             << velMs.x << ' ' << velMs.y << ' ' << velMs.z << ' '
-            << r << ' ' << g << ' ' << b << '\n';
+            << col.r << ' ' << col.g << ' ' << col.b << '\n';
 
         if (!out.good()) {
             std::cerr << "SaveSystemToTextFile: write error for file: " << filePath << "\n";
