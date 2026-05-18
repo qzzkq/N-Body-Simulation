@@ -53,7 +53,7 @@ make datacreator
 
 ```
 
-### 🪟 Windows (CMake + MSYS2)
+### 🪟 Windows & Linux (CMake + MSYS2)
 
 Рекомендуется использовать окружение **MSYS2 MINGW64**. Склонируйте репозиторий в домашнюю директорию (`/home/username/`).
 
@@ -62,8 +62,8 @@ make datacreator
 
 ```bash
 cd project
-cmake -S . -B build -G "Ninja"
-cmake --build build
+cmake -S . -B build_сmake
+cmake --build build_cmake
 
 ```
 
