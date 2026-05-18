@@ -9,6 +9,7 @@ import subprocess
 from tkinter import filedialog
 import tkinter as tk
 import customtkinter as ctk
+import sys
 
 FONT_HEADER  = ("Helvetica Neue", 15, "bold")
 FONT_LABEL   = ("Helvetica Neue", 11)
@@ -40,8 +41,10 @@ class RoundedButton(tk.Canvas):
 
     def _draw(self, _=None):
         self.delete("all")
-        w = self.winfo_width()  or int(self["width"])
-        h = self.winfo_height() or int(self["height"])
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 1: w = int(self["width"])
+        if h <= 1: h = int(self["height"])
         r   = h // 2
         col = self._bg_hover if self._hovered else self._bg
         self.create_arc(0, 0, r*2, h,     start=90,  extent=180, fill=col, outline="")
@@ -55,7 +58,6 @@ class RoundedButton(tk.Canvas):
 
 
 class RoundedEntry(tk.Canvas):
-    """Поле ввода со скруглёнными краями — как в макете."""
     def __init__(self, parent, palette: dict, width=520, height=52, **kw):
         if "bg" not in kw:
             kw["bg"] = parent["bg"]
@@ -251,15 +253,35 @@ class PlayPage(tk.Frame):
             self.meta_lbl.configure(text="Ошибка: Файл не найден!", fg="#f87171")
             return
             
-        binary_name = self.config.get("replay_bin", "replay")
-        binary_path = os.path.join(self.project_root, binary_name)
-        
+        binary_name = self.config.get("simulate_bin", "Simulate")
+
+        if sys.platform == "win32" and not binary_name.endswith(".exe"):
+            binary_name += ".exe"
+
+        build_dir = self.config.get("build_dir", "build")
+
+        possible_paths = [
+            os.path.join(self.project_root, build_dir, binary_name),            
+            os.path.join(self.project_root, build_dir, "Release", binary_name), 
+            os.path.join(self.project_root, build_dir, "Debug", binary_name),   
+            os.path.join(self.project_root, binary_name),                       
+        ]
+
+        binary_path = None
+        for p in possible_paths:
+            if os.path.exists(p):
+                binary_path = p
+                break
+
+        if not binary_path:
+            self.status_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", text_color="#f87171")
+            return
+                
         if not os.path.exists(binary_path):
             self.meta_lbl.configure(text=f"Ошибка: Исполняемый файл '{binary_name}' не найден.", fg="#f87171")
             return
             
         self.meta_lbl.configure(text="Запуск Replay...")
         
-        # replay.cpp ожидает путь к файлу первым аргументом без флагов
         cmd = [binary_path, path]
         subprocess.Popen(cmd, cwd=self.project_root)

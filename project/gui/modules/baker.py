@@ -14,6 +14,7 @@ import threading
 from tkinter import filedialog
 import tkinter as tk
 import customtkinter as ctk
+import sys
 
 # ── Данные из main.cpp ─────────────────────────────────────
 RENDER_MODES   = [("Сферы", "1"), ("Кубы", "0"), ("Точки", "2")]
@@ -30,7 +31,6 @@ FONT_PROGRESS  = ("Helvetica Neue", 10)
 
 
 class RoundedButton(tk.Canvas):
-    """Таблетообразная кнопка как в макете."""
     def __init__(self, parent, text, command=None, width=130, height=42,
                  bg_color="#3d9de0", bg_hover="#5ab0f0",
                  text_color="#ffffff", font=None, **kw):
@@ -55,8 +55,10 @@ class RoundedButton(tk.Canvas):
 
     def _draw(self, _=None):
         self.delete("all")
-        w, h = self.winfo_width() or int(self["width"]), \
-               self.winfo_height() or int(self["height"])
+        w = self.winfo_width()
+        h = self.winfo_height()
+        if w <= 1: w = int(self["width"])
+        if h <= 1: h = int(self["height"])
         r   = h // 2
         col = self._bg_hover if self._hovered else self._bg
         self.create_arc(0, 0, r*2, h, start=90, extent=180, fill=col, outline="")
@@ -71,7 +73,6 @@ class RoundedButton(tk.Canvas):
 
 
 class Panel(tk.Frame):
-    """Тёмная панель с тонкой рамкой — как в макете."""
     def __init__(self, parent, palette: dict, **kw):
         super().__init__(parent,
                          bg=palette["bg"],
@@ -479,11 +480,32 @@ class CalculatePage(tk.Frame):
         outfile = self.outfile_entry.get().strip() or "frames"
         is_rt   = self.rt_var.get()
         
-        binary_name = self.config.get("simulate_bin", "nBodySim")
-        binary_path = os.path.join(self.project_root, binary_name)
+        binary_name = self.config.get("simulate_bin", "Simulate")
+
+        if sys.platform == "win32" and not binary_name.endswith(".exe"):
+            binary_name += ".exe"
+
+        build_dir = self.config.get("build_dir", "build")
+
+        possible_paths = [
+            os.path.join(self.project_root, build_dir, binary_name),            
+            os.path.join(self.project_root, build_dir, "Release", binary_name), 
+            os.path.join(self.project_root, build_dir, "Debug", binary_name),   
+            os.path.join(self.project_root, binary_name),                       
+        ]
+
+        binary_path = None
+        for p in possible_paths:
+            if os.path.exists(p):
+                binary_path = p
+                break
+
+        if not binary_path:
+            self.status_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", text_color="#f87171")
+            return
         
         if not os.path.exists(binary_path):
-            self._set_result(f"Ошибка: Файл '{binary_name}' не найден. Скомпилируй через make.")
+            self._set_result(f"Ошибка: Файл '{binary_name}' не найден")
             return
 
         cmd = [

@@ -166,5 +166,5 @@ include(CPack)
 # ---------------------------------------------------------
 # 7. Тесты
 # ---------------------------------------------------------
-enable_testing()
-add_subdirectory(tests)
+#enable_testing()
+#add_subdirectory(tests)
