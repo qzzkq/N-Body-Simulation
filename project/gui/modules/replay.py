@@ -253,7 +253,7 @@ class PlayPage(tk.Frame):
             self.meta_lbl.configure(text="Ошибка: Файл не найден!", fg="#f87171")
             return
             
-        binary_name = self.config.get("simulate_bin", "Simulate")
+        binary_name = self.config.get("replay_bin", "Replay")
 
         if sys.platform == "win32" and not binary_name.endswith(".exe"):
             binary_name += ".exe"
@@ -274,7 +274,7 @@ class PlayPage(tk.Frame):
                 break
 
         if not binary_path:
-            self.status_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", text_color="#f87171")
+            self.meta_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", fg="#f87171")
             return
                 
         if not os.path.exists(binary_path):

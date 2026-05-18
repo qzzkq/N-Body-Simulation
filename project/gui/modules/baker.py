@@ -501,7 +501,7 @@ class CalculatePage(tk.Frame):
                 break
 
         if not binary_path:
-            self.status_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", text_color="#f87171")
+            self.status_lbl.configure(text=f"Ошибка: файл '{binary_name}' не найден в папке '{build_dir}'!", fg="#f87171")
             return
         
         if not os.path.exists(binary_path):

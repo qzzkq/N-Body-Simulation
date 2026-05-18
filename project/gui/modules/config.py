@@ -7,7 +7,7 @@ import os
 
 
 _DEFAULTS = {
-    "build_dir":        "build",
+    "build_dir":        "build_cmake",
     "simulate_bin":     "Simulate",
     "replay_bin":       "Replay",
     "data_dir":         "data",
