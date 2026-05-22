@@ -62,7 +62,7 @@ make datacreator
 
 ```bash
 cd project
-cmake -S . -B build_сmake
+cmake -S . -B build_cmake
 cmake --build build_cmake
 
 ```
@@ -211,10 +211,22 @@ cmake --build build_cmake
     ├── data/        # Входные файлы конфигураций NASA/пресетов и выходные логи .h5
     ├── include/     # Заголовочные файлы интерфейсов (.hpp)
     ├── src/         # Реализация логики симулятора, плеера и редактора (.cpp / .cu)
+    ├── gui/
     ├── CMakeLists.txt
     └── Makefile
 
 ```
+
+---
+
+### 🖥  GUI-лаунчер (Python)
+  Альтернатива CLI — графический лаунчер на customtkinter:
+  \`\`\`bash
+  cd project/gui
+  ./setup_venv.sh     # один раз
+  ./launch.sh
+  \`\`\`
+  Запускает nBodySim как дочерний процесс с собранными флагами.
 
 ---
 
