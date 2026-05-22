@@ -15,11 +15,20 @@ from tkinter import filedialog
 import tkinter as tk
 import customtkinter as ctk
 
+from modules.discovery import discover_algorithms, discover_scenarios
+
 # ── Данные из main.cpp ─────────────────────────────────────
 RENDER_MODES   = [("Сферы", "1"), ("Кубы", "0"), ("Точки", "2")]
-ALGORITHMS     = [("Брутфорс  O(N²)", "1"), ("Барнс-Хат CPU", "2"), ("Барнс-Хат CUDA", "3")]
 SOURCES        = ["HDF5 (.h5)", "TXT (.txt)", "Случайная генерация"]
-SCENARIOS      = ["Кольцо из объектов", "8 Кластеров"]
+
+# Fallback на случай, если папка algo/ или generators.cpp недоступны
+_ALGO_FALLBACK = [
+    {"label": "Брутфорс  O(N²)", "code": "1"},
+    {"label": "Барнс-Хат CPU",   "code": "2"},
+    {"label": "Барнс-Хат CUDA",  "code": "3"},
+    {"label": "WHFast",           "code": "4"},
+]
+_SCEN_FALLBACK = ["Кольцо из объектов", "8 Кластеров"]
 
 FONT_PANEL_HDR = ("Helvetica Neue", 13, "bold")
 FONT_LABEL     = ("Helvetica Neue", 11)
@@ -154,6 +163,9 @@ class CalculatePage(tk.Frame):
         self.data_dir     = os.path.join(project_root, config.get("data_dir", "data"))
         self._progress    = 0.0
 
+        self._algos     = discover_algorithms(project_root) or _ALGO_FALLBACK
+        self._scenarios = discover_scenarios(project_root)  or _SCEN_FALLBACK
+
         self.grid_rowconfigure(0, weight=1)
         self.grid_columnconfigure(0, weight=1)
 
@@ -192,12 +204,13 @@ class CalculatePage(tk.Frame):
     # ──────────────────────────────────────────────────────
     def _build_panel_algo(self, p):
         p.section("Algorithm")
-        self.algo_var = tk.StringVar(value=ALGORITHMS[0][1])
-        
+        self.algo_var = tk.StringVar(value=self._algos[0]["code"])
+
         f_alg = ctk.CTkFrame(p, fg_color="transparent")
         f_alg.pack(fill="x", padx=14, pady=0)
-        
-        for label, val in ALGORITHMS:
+
+        for a in self._algos:
+            label, val = a["label"], a["code"]
             ctk.CTkRadioButton(
                 f_alg, text=label, variable=self.algo_var, value=val,
                 text_color="#ffffff", fg_color="#3d9de0", hover_color="#5ab0f0",
@@ -317,7 +330,7 @@ class CalculatePage(tk.Frame):
                  fg=self.pal["dim"], font=FONT_LABEL).pack(
             fill="x", padx=14, pady=(4, 0))
         self.scenario_var = tk.StringVar(value="1")
-        for i, name in enumerate(SCENARIOS):
+        for i, name in enumerate(self._scenarios):
             tk.Radiobutton(f, text=name, variable=self.scenario_var,
                            value=str(i + 1),
                            bg=self.pal["bg"], fg=self.pal["text"],
