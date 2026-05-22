@@ -24,14 +24,16 @@ if [ -d "$VENV_DIR" ]; then
     echo "✓  venvalready exists in: $VENV_DIR"
 else
     echo "→ Create venv.."
-    python3 -m venv "$VENV_DIR"
+    python -m venv --system-site-packages "$VENV_DIR"
     echo "✓  venvhas been created"
 fi
 
 echo "→ Install dependencies..."
 source "$VENV_DIR/bin/activate"
-pip install --upgrade pip --quiet
-pip install -r "$SCRIPT_DIR/requirements.txt"
+
+python -m pip install --upgrade pip --quiet
+
+python -m pip install -r "$SCRIPT_DIR/requirements.txt"
 
 echo ""
 echo "──────────────────────────────────────────"
