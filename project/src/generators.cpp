@@ -16,7 +16,8 @@ public:
         return "Кольцо из объектов";
     }
 
-    void generate(std::vector<Object>& out, const GenParams& p) override {
+    void generate(std::vector<Object>& out, const GenParams& p,
+                  std::vector<GraphicState>* /*outGraphics*/) override {
         out.clear();
         out.reserve(static_cast<size_t>(p.count) + 1);
 
@@ -69,7 +70,8 @@ public:
         return "8 Кластеров";
     }
 
-    void generate(std::vector<Object>& out, const GenParams& p) override {
+    void generate(std::vector<Object>& out, const GenParams& p,
+                  std::vector<GraphicState>* /*outGraphics*/) override {
         out.clear();
         out.reserve(static_cast<size_t>(p.count) + 1);
 
@@ -133,7 +135,8 @@ public:
         return "M13 (Plummer-скопление)";
     }
 
-    void generate(std::vector<Object>& out, const GenParams& p) override {
+    void generate(std::vector<Object>& out, const GenParams& p,
+                  std::vector<GraphicState>* /*outGraphics*/) override {
         out.clear();
         if (p.count <= 0) return;
         out.reserve(static_cast<size_t>(p.count));
@@ -190,6 +193,169 @@ public:
     }
 };
 
+class GalaxyCollisionScenario : public IScenario {
+public:
+    std::string getName() const override {
+        return "Столкновение 2 галактик (синяя+красная)";
+    }
+
+    void generate(std::vector<Object>& out, const GenParams& p,
+                  std::vector<GraphicState>* g) override {
+        out.clear();
+        if (g) g->clear();
+
+        const int total = std::max(p.count, 0);
+        const int n1 = total / 2;
+        const int n2 = total - n1;
+        out.reserve(static_cast<size_t>(total) + 2);
+        if (g) g->reserve(static_cast<size_t>(total) + 2);
+
+        std::mt19937 rng(p.seed ? p.seed : 1337u);
+
+        const float R_max = std::max(p.maxRadius, 1.0f);
+        const float D = R_max * 4.0f;
+        const float impact = R_max * 0.5f;
+
+        const double totalMass = 2.0 * p.centralMass + total * p.baseMass;
+        const double vAppr = std::sqrt(physics::G * totalMass / (2.0 * D)) * 1.05;
+
+        glm::vec3 c1(-D, 0.0f, +impact * 0.5f);
+        glm::vec3 c2(+D, 0.0f, -impact * 0.5f);
+        glm::vec3 vb1(+static_cast<float>(vAppr), 0.0f, 0.0f);
+        glm::vec3 vb2(-static_cast<float>(vAppr), 0.0f, 0.0f);
+
+        glm::mat3 R1(1.0f);
+        const float ang2 = 0.6f;
+        const float ca = std::cos(ang2), sa = std::sin(ang2);
+        glm::mat3 R2(
+            glm::vec3(1.0f, 0.0f, 0.0f),
+            glm::vec3(0.0f,   ca,  -sa),
+            glm::vec3(0.0f,   sa,   ca)
+        );
+
+        addGalaxy(out, g, rng, n1, p, c1, vb1, R1, /*hueBase=*/220.0f);
+        addGalaxy(out, g, rng, n2, p, c2, vb2, R2, /*hueBase=*/  5.0f);
+    }
+
+private:
+    static glm::vec3 hsv2rgb(float h, float s, float v) {
+        h = std::fmod(h, 360.0f); if (h < 0) h += 360.0f;
+        float c = v * s;
+        float x = c * (1.0f - std::fabs(std::fmod(h / 60.0f, 2.0f) - 1.0f));
+        float m = v - c;
+        glm::vec3 rgb;
+        if      (h <  60.0f) rgb = glm::vec3(c, x, 0);
+        else if (h < 120.0f) rgb = glm::vec3(x, c, 0);
+        else if (h < 180.0f) rgb = glm::vec3(0, c, x);
+        else if (h < 240.0f) rgb = glm::vec3(0, x, c);
+        else if (h < 300.0f) rgb = glm::vec3(x, 0, c);
+        else                 rgb = glm::vec3(c, 0, x);
+        return rgb + glm::vec3(m);
+    }
+
+    static void addGalaxy(std::vector<Object>& out,
+                          std::vector<GraphicState>* g,
+                          std::mt19937& rng,
+                          int n,
+                          const GenParams& p,
+                          const glm::vec3& center,
+                          const glm::vec3& bulkVel,
+                          const glm::mat3& R,
+                          float hueBase)
+    {
+        std::uniform_real_distribution<float> u01(0.0f, 1.0f);
+        std::normal_distribution<float>       gauss(0.0f, 1.0f);
+        std::uniform_real_distribution<float> uAngle(0.0f, 6.28318530718f);
+
+        {
+            Object bh(glm::dvec3(center), glm::dvec3(bulkVel), p.centralMass, 141000.0, std::nullopt);
+            bh.Initalizing = false;
+            bh.radius = CalcRadiusAU(bh.mass);
+            out.push_back(bh);
+            if (g) {
+                GraphicState gs;
+                glm::vec3 core = hsv2rgb(hueBase, 0.25f, 1.0f);
+                gs.color = glm::vec4(glm::mix(core, glm::vec3(1.0f), 0.6f), 1.0f);
+                g->push_back(gs);
+            }
+        }
+
+        const float R_min = std::max(p.minRadius, 0.1f);
+        const float R_max = std::max(p.maxRadius, R_min + 1.0f);
+        const float R_d   = (R_min + R_max) * 0.25f;
+        const float bulgeFrac   = 0.15f;
+        const float bulgeRadius = std::max(R_min * 2.0f, R_max * 0.08f);
+
+        for (int i = 0; i < n; ++i) {
+            bool isBulge = u01(rng) < bulgeFrac;
+            glm::vec3 pos(0.0f), vel(0.0f);
+
+            if (isBulge) {
+                // Изотропная сфера, плотность ~ 1/(1+r/a)^2
+                float u = u01(rng);
+                float r = bulgeRadius * u / std::max(1e-4f, 1.0f - u);
+                r = std::min(r, bulgeRadius * 4.0f);
+                float cosT = 1.0f - 2.0f * u01(rng);
+                float sinT = std::sqrt(std::max(0.0f, 1.0f - cosT * cosT));
+                float phi  = uAngle(rng);
+                pos = glm::vec3(r * sinT * std::cos(phi),
+                                r * cosT,
+                                r * sinT * std::sin(phi));
+                double dist = std::max(static_cast<double>(r), 1e-6);
+                double vc = std::sqrt(physics::G * p.centralMass / dist);
+                glm::vec3 randv(gauss(rng), gauss(rng), gauss(rng));
+                glm::vec3 cross = glm::cross(pos, randv);
+                float len = glm::length(cross);
+                glm::vec3 tdir = (len > 1e-6f) ? (cross / len) : glm::vec3(0, 1, 0);
+                vel = tdir * static_cast<float>(vc) * 0.6f;
+            } else {
+                // Экспоненциальный диск (Rayleigh-аппроксимация)
+                float r;
+                int guard = 0;
+                do {
+                    float u = std::max(u01(rng), 1e-6f);
+                    r = R_d * std::sqrt(-2.0f * std::log(u));
+                    if (++guard > 32) { r = std::clamp(r, R_min, R_max); break; }
+                } while (r < R_min || r > R_max);
+
+                float a = uAngle(rng);
+                float zSigma = p.spread * std::exp(-r / (R_d * 2.5f));
+                float z = gauss(rng) * std::max(zSigma, 0.05f);
+
+                pos = glm::vec3(r * std::cos(a), z, r * std::sin(a));
+                glm::vec3 tdir(-std::sin(a), 0.0f, std::cos(a));
+                double dist = std::sqrt(static_cast<double>(r) * r + static_cast<double>(z) * z);
+                double vc = std::sqrt(physics::G * p.centralMass / std::max(dist, 1e-9));
+                vel = tdir * static_cast<float>(vc);
+            }
+
+            pos = R * pos;
+            vel = R * vel;
+            glm::dvec3 wp = glm::dvec3(pos) + glm::dvec3(center);
+            glm::dvec3 wv = glm::dvec3(vel) + glm::dvec3(bulkVel);
+
+            Object o(wp, wv, p.baseMass, 1410.0, std::nullopt);
+            o.Initalizing = false;
+            o.radius = CalcRadiusAU(o.mass);
+            out.push_back(std::move(o));
+
+            if (g) {
+                GraphicState gs;
+                float hue = hueBase + (u01(rng) * 2.0f - 1.0f) * 22.0f;
+                float sat = 0.55f + u01(rng) * 0.40f;
+                float val = 0.65f + u01(rng) * 0.35f;
+                if (isBulge) {
+                    val = std::min(1.0f, val + 0.15f);
+                    sat = std::max(0.20f, sat - 0.25f);
+                }
+                glm::vec3 col = hsv2rgb(hue, sat, val);
+                gs.color = glm::vec4(col, 1.0f);
+                g->push_back(gs);
+            }
+        }
+    }
+};
+
 void ScenarioManager::registerScenario(std::unique_ptr<IScenario> scenario) {
     scenarios_.push_back(std::move(scenario));
 }
@@ -202,10 +368,11 @@ std::vector<std::string> ScenarioManager::getNames() const {
     return names;
 }
 
-void ScenarioManager::runScenario(size_t index, std::vector<Object>& out, const GenParams& params) {
+void ScenarioManager::runScenario(size_t index, std::vector<Object>& out, const GenParams& params,
+                                  std::vector<GraphicState>* outGraphics) {
     if (isValidIndex(index)) {
         std::cout << "Генерируем: " << scenarios_[index]->getName() << "...\n";
-        scenarios_[index]->generate(out, params);
+        scenarios_[index]->generate(out, params, outGraphics);
     } else {
         std::cerr << "Неправильный индекс генерации!\n";
     }
@@ -220,5 +387,6 @@ std::unique_ptr<ScenarioManager> CreateDefaultManager() {
     mgr->registerScenario(std::make_unique<RingScenario>());
     mgr->registerScenario(std::make_unique<ClusterScenario>());
     mgr->registerScenario(std::make_unique<M13PlummerScenario>());
+    mgr->registerScenario(std::make_unique<GalaxyCollisionScenario>());
     return mgr;
 }

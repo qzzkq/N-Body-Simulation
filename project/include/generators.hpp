@@ -24,6 +24,7 @@
 #include <memory>
 #include <glm/glm.hpp>
 #include "object.hpp"
+#include "graphic_state.hpp"
 
 /**
  * @struct GenParams
@@ -71,7 +72,8 @@ public:
      * @param out    [out] Массив тел для добавления (append, не replace).
      * @param params Параметры генерации.
      */
-    virtual void generate(std::vector<Object>& out, const GenParams& params) = 0;
+    virtual void generate(std::vector<Object>& out, const GenParams& params,
+                          std::vector<GraphicState>* outGraphics = nullptr) = 0;
 };
 
 /**
@@ -117,7 +119,8 @@ public:
      * @param out    [out] Целевой массив тел.
      * @param params Параметры генерации.
      */
-    void runScenario(size_t index, std::vector<Object>& out, const GenParams& params);
+    void runScenario(size_t index, std::vector<Object>& out, const GenParams& params,
+                     std::vector<GraphicState>* outGraphics = nullptr);
 
     /**
      * @brief Проверяет валидность индекса сценария.

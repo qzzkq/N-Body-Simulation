@@ -343,11 +343,15 @@ int main(int argc, char* argv[]) {
             choice = std::stoi(getCmdOption(argc, argv, "--scenario", "0")) + 1;
         }
         
+        graphics.clear();
         if (choice > 0 && choice <= scenNames.size()) {
-            scenarioManager->runScenario(choice - 1, objs, params);
+            scenarioManager->runScenario(choice - 1, objs, params, &graphics);
         } else {
             std::cout << "Неверный выбор, запускаем первый по списку.\n";
-            scenarioManager->runScenario(0, objs, params);
+            scenarioManager->runScenario(0, objs, params, &graphics);
+        }
+        if (graphics.size() == objs.size() && !graphics.empty()) {
+            loadedColorsFromTxt = true; 
         }
     }
 

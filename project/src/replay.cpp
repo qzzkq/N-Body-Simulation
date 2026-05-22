@@ -294,11 +294,9 @@ int main(int argc, char** argv) {
         for (size_t i = 0; i < numBodies; ++i) {
             objs[i].position = targetPosition[i];
         }
-
         for (size_t i = 0; i < numBodies; ++i) {
             graphics[i].updateTrail(objs[i].position);
         }
-
         lastFrameA = frameA;
 
     renderer.renderFrame(objs, graphics, cam); 
