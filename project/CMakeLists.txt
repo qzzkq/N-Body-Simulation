@@ -10,6 +10,9 @@ endif()
 
 include(GNUInstallDirs)
 
+# По умолчанию ВЫКЛЮЧЕНО, чтобы vcpkg сам копировал DLL без ошибок доступа
+option(USE_MANUAL_DLL_COPY "Включить ручное копирование DLL после сборки" OFF)
+
 # ---------------------------------------------------------
 # 1. Поиск зависимостей
 # ---------------------------------------------------------
@@ -146,19 +149,29 @@ install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR})
 # 6. Windows DLL Deployment
 # ---------------------------------------------------------
 if(WIN32)
-    install(FILES $<TARGET_RUNTIME_DLLS:Simulate> DESTINATION ${CMAKE_INSTALL_BINDIR})
-    
+    # Этот блок выполняется ВСЕГДА — копируем только папку data
     foreach(TARGET_NAME Simulate Replay DataCreator)
         add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
             COMMAND ${CMAKE_COMMAND} -E copy_directory
                 "${CMAKE_CURRENT_SOURCE_DIR}/data"
                 "$<TARGET_FILE_DIR:${TARGET_NAME}>/data"
-            COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:${TARGET_NAME}>"
-                $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>
-            COMMENT "Copying data and DLLs to ${TARGET_NAME} directory..."
-            COMMAND_EXPAND_LISTS
+            COMMENT "Copying data folder to ${TARGET_NAME}..."
         )
     endforeach()
+
+    # А этот блок (код твоего друга) включится ТОЛЬКО если изменить опцию на ON
+    if(USE_MANUAL_DLL_COPY)
+        install(FILES $<TARGET_RUNTIME_DLLS:Simulate> DESTINATION ${CMAKE_INSTALL_BINDIR})
+        
+        foreach(TARGET_NAME Simulate Replay DataCreator)
+            add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
+                COMMAND ${CMAKE_COMMAND} -E copy -t "$<TARGET_FILE_DIR:${TARGET_NAME}>"
+                    $<TARGET_RUNTIME_DLLS:${TARGET_NAME}>
+                COMMENT "Copying DLLs to ${TARGET_NAME} directory (Manual Mode)..."
+                COMMAND_EXPAND_LISTS
+            )
+        endforeach()
+    endif()
 endif()
 
 include(CPack)
