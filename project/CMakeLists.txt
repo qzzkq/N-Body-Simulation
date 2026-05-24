@@ -8,6 +8,10 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
 
+if(DEFINED CMAKE_TOOLCHAIN_FILE AND CMAKE_TOOLCHAIN_FILE MATCHES "vcpkg")
+    set(X_VCPKG_APPLOCAL_DEPS_INSTALL ON CACHE BOOL "Automatically copy dependencies on install")
+endif()
+
 include(GNUInstallDirs)
 
 # По умолчанию ВЫКЛЮЧЕНО, чтобы vcpkg сам копировал DLL без ошибок доступа
@@ -140,26 +144,43 @@ target_link_libraries(DataCreator PRIVATE Core)
 # ---------------------------------------------------------
 # 5. Установка (INSTALL)
 # ---------------------------------------------------------
+
 install(TARGETS Simulate Replay DataCreator
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    RUNTIME DESTINATION build_cmake
 )
-install(DIRECTORY data DESTINATION ${CMAKE_INSTALL_BINDIR})
+
+install(DIRECTORY data DESTINATION build_cmake)
+
+if(WIN32)
+    set(VCPKG_BIN_DIR "C:/vcpkg/installed/x64-windows/bin")
+
+    install(FILES 
+        "${VCPKG_BIN_DIR}/hdf5.dll"
+        "${VCPKG_BIN_DIR}/hdf5_cpp.dll"
+        "${VCPKG_BIN_DIR}/glew32.dll"
+        "${VCPKG_BIN_DIR}/glfw3.dll"
+        "${VCPKG_BIN_DIR}/zlib1.dll"
+        "${VCPKG_BIN_DIR}/szip.dll"
+        DESTINATION build_cmake
+        OPTIONAL
+    )
+endif()
+
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/gui")
+    install(DIRECTORY gui DESTINATION .)
+endif()
 
 # ---------------------------------------------------------
 # 6. Windows DLL Deployment
 # ---------------------------------------------------------
 if(WIN32)
-    # Этот блок выполняется ВСЕГДА — копируем только папку data
-    foreach(TARGET_NAME Simulate Replay DataCreator)
-        add_custom_command(TARGET ${TARGET_NAME} POST_BUILD
-            COMMAND ${CMAKE_COMMAND} -E copy_directory
-                "${CMAKE_CURRENT_SOURCE_DIR}/data"
-                "$<TARGET_FILE_DIR:${TARGET_NAME}>/data"
-            COMMENT "Copying data folder to ${TARGET_NAME}..."
-        )
-    endforeach()
+    add_custom_command(TARGET Simulate POST_BUILD
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+            "${CMAKE_CURRENT_SOURCE_DIR}/data"
+            "$<TARGET_FILE_DIR:Simulate>/data"
+        COMMENT "Copying data folder to Simulate directory..."
+    )
 
-    # А этот блок (код твоего друга) включится ТОЛЬКО если изменить опцию на ON
     if(USE_MANUAL_DLL_COPY)
         install(FILES $<TARGET_RUNTIME_DLLS:Simulate> DESTINATION ${CMAKE_INSTALL_BINDIR})
         
